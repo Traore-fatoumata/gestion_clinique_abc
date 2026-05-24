@@ -7,6 +7,7 @@ import { C, Avatar, Badge, Btn, today, getNowTime, DEMANDES_INIT } from "./labor
 import ModalNouvelleDemande  from "./laboratoire/ModalNouvelleDemande.jsx"
 import ModalSaisieResultats  from "./laboratoire/ModalSaisieResultats.jsx"
 import ModalFicheLaboratoire from "./laboratoire/ModalFicheLaboratoire.jsx"
+import laboService from "../../services/laboService"
 
 export default function DashboardLaboratoire() {
   const { user, logout } = useAuth()
@@ -23,6 +24,46 @@ export default function DashboardLaboratoire() {
   const [recherche,           setRecherche]           = useState("")
   const [heure,               setHeure]               = useState(getNowTime())
   const [dateStr,             setDateStr]             = useState("")
+  const [loading,             setLoading]             = useState(false)
+
+  // Charger les demandes depuis l'API
+  useEffect(() => {
+    const chargerDemandes = async () => {
+      try {
+        setLoading(true)
+        const response = await laboService.listerDemandes()
+        if (response.success && response.demandes) {
+          const demandesFormattees = response.demandes.map(d => ({
+            id: d.id,
+            patientId: d.patientId,
+            patient: d.patient,
+            dateDemande: d.dateDemande,
+            heureDemande: d.heureDemande,
+            medecinPrescripteur: d.medecinPrescripteur,
+            service: d.service,
+            examens: d.examens,
+            statut: d.statut,
+            datePrelevement: d.datePrelevement,
+            heurePrelevement: d.heurePrelevement,
+            dateRendu: d.dateRendu,
+            heureRendu: d.heureRendu,
+            resultats: {},
+            valide: d.valide,
+            validePar: d.validePar,
+            valideLe: d.valideLe,
+            urgent: d.urgent,
+            commentaireGlobal: d.commentaireGlobal
+          }))
+          setDemandes(demandesFormattees)
+        }
+      } catch (err) {
+        console.error("Erreur chargement demandes labo:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    chargerDemandes()
+  }, [])
 
   useEffect(() => {
     const tick = () => {
