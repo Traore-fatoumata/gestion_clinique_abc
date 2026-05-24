@@ -28,8 +28,7 @@ app.use("/api/notifications", require("./routes/notifications"))
 app.use("/api/rdv",          require("./routes/rdv"))
 app.use("/api/labo",         require("./routes/labo"))
 app.use("/api/soins",        require("./routes/soins"))
-// 🔜 Prochaines routes :
-// app.use("/api/parametres", require("./routes/parametres"))
+app.use("/api/parametres",     require("./routes/parametres"))
 
 // ── Route de santé ──────────────────────────────────────
 app.get("/api/health", (_req, res) => {
