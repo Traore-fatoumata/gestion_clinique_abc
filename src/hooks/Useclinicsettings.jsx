@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState, useEffect, createContext, useContext, useRef } from 'react'
+import parametresService from '../services/parametresService'
 
 const ClinicSettingsContext = createContext()
 
@@ -135,7 +136,41 @@ export function ClinicSettingsProvider({ children }) {
     return DEFAULT_SETTINGS
   })
 
+  const [apiLoaded, setApiLoaded] = useState(false)
   const initialized = useRef(false)
+
+  // Charger les paramètres depuis l'API au démarrage
+  useEffect(() => {
+    if (apiLoaded) return
+    const chargerParametres = async () => {
+      try {
+        const response = await parametresService.recupererTous()
+        if (response.success && response.parametres) {
+          const params = response.parametres
+          // Mapper les paramètres API vers les settings locaux
+          const mappedSettings = { ...settings }
+          // Identité
+          if (params.nomClinique) mappedSettings.nomClinique = params.nomClinique.valeur
+          if (params.telephone) mappedSettings.telephone = params.telephone.valeur
+          if (params.email) mappedSettings.email = params.email.valeur
+          if (params.adresse) mappedSettings.adresse = params.adresse.valeur
+          // Tarifs
+          if (params.tarifConsultation) mappedSettings.tarifConsultation = parseInt(params.tarifConsultation.valeur) || 50000
+          if (params.tarifUrgence) mappedSettings.tarifUrgence = parseInt(params.tarifUrgence.valeur) || 100000
+          if (params.devise) mappedSettings.devise = params.devise.valeur
+          // Apparence
+          if (params.couleurPrimaire) mappedSettings.couleurPrimaire = params.couleurPrimaire.valeur
+          if (params.theme) mappedSettings.theme = params.theme.valeur
+          setSettings(mappedSettings)
+        }
+      } catch (err) {
+        console.error("Erreur chargement paramètres API:", err)
+      } finally {
+        setApiLoaded(true)
+      }
+    }
+    chargerParametres()
+  }, [])
 
   const applyToDOM = (s) => {
     const r = document.documentElement
