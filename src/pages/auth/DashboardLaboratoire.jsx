@@ -24,13 +24,11 @@ export default function DashboardLaboratoire() {
   const [recherche,           setRecherche]           = useState("")
   const [heure,               setHeure]               = useState(getNowTime())
   const [dateStr,             setDateStr]             = useState("")
-  const [loading,             setLoading]             = useState(false)
 
   // Charger les demandes depuis l'API
   useEffect(() => {
     const chargerDemandes = async () => {
       try {
-        setLoading(true)
         const response = await laboService.listerDemandes()
         if (response.success && response.demandes) {
           const demandesFormattees = response.demandes.map(d => ({
@@ -58,8 +56,6 @@ export default function DashboardLaboratoire() {
         }
       } catch (err) {
         console.error("Erreur chargement demandes labo:", err)
-      } finally {
-        setLoading(false)
       }
     }
     chargerDemandes()

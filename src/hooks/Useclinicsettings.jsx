@@ -140,6 +140,7 @@ export function ClinicSettingsProvider({ children }) {
   const initialized = useRef(false)
 
   // Charger les paramètres depuis l'API au démarrage
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (apiLoaded) return
     const chargerParametres = async () => {
@@ -148,20 +149,22 @@ export function ClinicSettingsProvider({ children }) {
         if (response.success && response.parametres) {
           const params = response.parametres
           // Mapper les paramètres API vers les settings locaux
-          const mappedSettings = { ...settings }
-          // Identité
-          if (params.nomClinique) mappedSettings.nomClinique = params.nomClinique.valeur
-          if (params.telephone) mappedSettings.telephone = params.telephone.valeur
-          if (params.email) mappedSettings.email = params.email.valeur
-          if (params.adresse) mappedSettings.adresse = params.adresse.valeur
-          // Tarifs
-          if (params.tarifConsultation) mappedSettings.tarifConsultation = parseInt(params.tarifConsultation.valeur) || 50000
-          if (params.tarifUrgence) mappedSettings.tarifUrgence = parseInt(params.tarifUrgence.valeur) || 100000
-          if (params.devise) mappedSettings.devise = params.devise.valeur
-          // Apparence
-          if (params.couleurPrimaire) mappedSettings.couleurPrimaire = params.couleurPrimaire.valeur
-          if (params.theme) mappedSettings.theme = params.theme.valeur
-          setSettings(mappedSettings)
+          setSettings(prev => {
+            const mapped = { ...prev }
+            // Identité
+            if (params.nomClinique) mapped.nomClinique = params.nomClinique.valeur
+            if (params.telephone) mapped.telephone = params.telephone.valeur
+            if (params.email) mapped.email = params.email.valeur
+            if (params.adresse) mapped.adresse = params.adresse.valeur
+            // Tarifs
+            if (params.tarifConsultation) mapped.tarifConsultation = parseInt(params.tarifConsultation.valeur) || 50000
+            if (params.tarifUrgence) mapped.tarifUrgence = parseInt(params.tarifUrgence.valeur) || 100000
+            if (params.devise) mapped.devise = params.devise.valeur
+            // Apparence
+            if (params.couleurPrimaire) mapped.couleurPrimaire = params.couleurPrimaire.valeur
+            if (params.theme) mapped.theme = params.theme.valeur
+            return mapped
+          })
         }
       } catch (err) {
         console.error("Erreur chargement paramètres API:", err)
@@ -170,7 +173,7 @@ export function ClinicSettingsProvider({ children }) {
       }
     }
     chargerParametres()
-  }, [])
+  }, [apiLoaded])
 
   const applyToDOM = (s) => {
     const r = document.documentElement

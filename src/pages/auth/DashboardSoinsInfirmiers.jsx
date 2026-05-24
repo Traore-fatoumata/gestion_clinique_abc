@@ -30,13 +30,11 @@ export default function DashboardSoinsInfirmiers() {
   const [recherche,    setRecherche]    = useState("")
   const [heure,        setHeure]        = useState(getNowTime())
   const [dateStr,      setDateStr]      = useState("")
-  const [loading,      setLoading]      = useState(false)
 
   // Charger les soins depuis l'API
   useEffect(() => {
     const chargerSoins = async () => {
       try {
-        setLoading(true)
         const response = await soinsService.listerSoins()
         if (response.success && response.soins) {
           const soinsFormattes = response.soins.map(s => ({
@@ -61,8 +59,6 @@ export default function DashboardSoinsInfirmiers() {
         }
       } catch (err) {
         console.error("Erreur chargement soins:", err)
-      } finally {
-        setLoading(false)
       }
     }
     chargerSoins()
