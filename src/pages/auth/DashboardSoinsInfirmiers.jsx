@@ -10,6 +10,7 @@ import {
 import ModalDetailSoin    from "./soins/ModalDetailSoin.jsx"
 import ModalNouveauSoin   from "./soins/ModalNouveauSoin.jsx"
 import ModalExecutionSoin from "./soins/ModalExecutionSoin.jsx"
+import soinsService from "../../services/soinsService"
 
 // ══════════════════════════════════════════════════════
 //  COMPOSANT PRINCIPAL
@@ -29,6 +30,43 @@ export default function DashboardSoinsInfirmiers() {
   const [recherche,    setRecherche]    = useState("")
   const [heure,        setHeure]        = useState(getNowTime())
   const [dateStr,      setDateStr]      = useState("")
+  const [loading,      setLoading]      = useState(false)
+
+  // Charger les soins depuis l'API
+  useEffect(() => {
+    const chargerSoins = async () => {
+      try {
+        setLoading(true)
+        const response = await soinsService.listerSoins()
+        if (response.success && response.soins) {
+          const soinsFormattes = response.soins.map(s => ({
+            id: s.id,
+            patientId: s.patientId,
+            patient: s.patient,
+            dateProgrammee: s.dateProgrammee,
+            heureProgrammee: s.heureProgrammee,
+            typeSoin: s.typeSoin,
+            zone: s.zone,
+            medicament: s.medicament,
+            dose: s.dose,
+            voie: s.voie,
+            infirmier: s.infirmier || "—",
+            observations: s.observations || "",
+            tolerance: s.tolerance || null,
+            statut: s.statut,
+            urgent: s.urgent,
+            heure: s.heure
+          }))
+          setSoins(soinsFormattes)
+        }
+      } catch (err) {
+        console.error("Erreur chargement soins:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    chargerSoins()
+  }, [])
 
   useEffect(() => {
     const tick = () => {
