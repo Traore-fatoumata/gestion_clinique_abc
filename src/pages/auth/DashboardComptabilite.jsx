@@ -639,56 +639,146 @@ export default function DashboardComptabilite() {
           )}
 
           {/* ── STATISTIQUES ── */}
-          {onglet === "stats" && (
-            <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-                <div style={{ background:C.white, borderRadius:16, border:"1px solid "+C.border, padding:"20px 24px" }}>
-                  <p style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>Répartition des lignes</p>
+          {onglet === "stats" && (() => {
+            const now = new Date()
+            const JOURS = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"]
+            const activiteHebo = JOURS.map((_,i) => {
+              const d = new Date(now); d.setDate(d.getDate()-((d.getDay()||7)-1)+i)
+              const dateStr = d.toISOString().slice(0,10)
+              return toutesLignes.filter(l => l.paiementInfo?.date === new Date(dateStr).toLocaleDateString("fr-FR")).length
+            })
+            const maxHebo = Math.max(...activiteHebo, 1)
+            const lignesPayees = toutesLignes.filter(l => l.paye)
+            const totalRecettes = lignesPayees.reduce((s,l) => s + (l.montantFacture || 0), 0)
+            const tauxPaiement = toutesLignes.length > 0 ? Math.round((lignesPayees.length / toutesLignes.length) * 100) : 0
+
+            const KPI_COLORS = [
+              { bg:"#dcfce7", fg:C.green },
+              { bg:"#e8f4fb", fg:C.blue },
+              { bg:"#fef3c7", fg:C.amber },
+              { bg:"#ede9fe", fg:C.purple },
+            ]
+
+            return (
+              <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+                {/* Header */}
+                <div style={{ marginBottom:8 }}>
+                  <p style={{ fontSize:26, fontWeight:800, color:C.textPri, letterSpacing:"-0.5px", marginBottom:4 }}>Statistiques & Rapports</p>
+                  <p style={{ fontSize:13, color:C.textSec }}>{toutesLignes.length} lignes · {lignesPayees.length} payées · {nbAttente} en attente</p>
+                </div>
+
+                {/* KPI — 4 cartes en ligne */}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:20 }}>
                   {[
-                    { label:"Lignes payées",     nb:toutesLignes.filter(l=>l.paye).length,  color:C.green },
-                    { label:"Lignes en attente", nb:nbAttente,                               color:C.red   },
-                  ].map(({ label, nb, color }) => {
-                    const total = toutesLignes.length || 1
+                    { label:"Total Lignes", val:toutesLignes.length, sub:`${lignesPayees.length} payées · ${nbAttente} en attente`, kpi:0 },
+                    { label:"Recettes (GNF)", val:fmtMoney(totalRecettes), sub:`Paiements encaissés`, kpi:1 },
+                    { label:"Taux de paiement", val:tauxPaiement+"%", sub:`${fmtMoney(totalEncaisse)} encaissé`, kpi:2 },
+                    { label:"Reste à encaisser", val:fmtMoney(totalAEncaisser), sub:`Paiements en attente`, kpi:3 },
+                  ].map(({label,val,sub,kpi}) => {
+                    const k = KPI_COLORS[kpi]
                     return (
-                      <div key={label} style={{ marginBottom:12 }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:13, color:C.textSec }}>{label}</span>
-                          <span style={{ fontSize:13, fontWeight:700, color }}>{nb}</span>
-                        </div>
-                        <div style={{ height:8, borderRadius:4, background:"#e5e7eb", overflow:"hidden" }}>
-                          <div style={{ height:"100%", width:`${(nb/total)*100}%`, background:color, borderRadius:4, transition:"width .5s" }} />
+                      <div key={label} style={{ background:C.white, borderRadius:16, padding:"20px 22px", border:"1px solid "+C.border, boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+                        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
+                          <div style={{ flex:1,minWidth:0 }}>
+                            <p style={{ fontSize:12,color:C.textSec,marginBottom:8,fontWeight:500 }}>{label}</p>
+                            <p style={{ fontSize:28,fontWeight:800,color:C.textPri,lineHeight:1,marginBottom:6 }}>{val}</p>
+                            <p style={{ fontSize:11,color:C.textMuted }}>{sub}</p>
+                          </div>
+                          <div style={{ width:44,height:44,borderRadius:12,background:k.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:k.fg,marginLeft:10 }}>
+                            {kpi===0 && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>}
+                            {kpi===1 && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>}
+                            {kpi===2 && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
+                            {kpi===3 && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
+                          </div>
                         </div>
                       </div>
                     )
                   })}
                 </div>
-                <div style={{ background:C.white, borderRadius:16, border:"1px solid "+C.border, padding:"20px 24px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-                  <p style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>Taux de recouvrement</p>
-                  <p style={{ fontSize:52, fontWeight:800, color:C.teal, letterSpacing:"-2px", lineHeight:1 }}>
-                    {(totalAEncaisser+totalEncaisse) > 0 ? Math.round((totalEncaisse/(totalAEncaisser+totalEncaisse))*100) : 0}%
-                  </p>
-                  <p style={{ fontSize:13, color:C.textMuted, marginTop:8 }}>{fmtMoney(totalEncaisse)} / {fmtMoney(totalAEncaisser+totalEncaisse)}</p>
-                </div>
-              </div>
-              <div style={{ background:C.white, borderRadius:16, border:"1px solid "+C.border, padding:"20px 24px" }}>
-                <p style={{ fontSize:15, fontWeight:700, marginBottom:14 }}>Grille tarifaire — Consultation</p>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12 }}>
-                  {[
-                    { label:"Nourrisson", tranche:"< 5 ans",    tarif:30000, color:C.purple },
-                    { label:"Enfant",     tranche:"5 – 14 ans", tarif:35000, color:C.blue   },
-                    { label:"Adulte",     tranche:"15 – 60 ans",tarif:50000, color:C.green  },
-                    { label:"Senior",     tranche:"> 60 ans",   tarif:40000, color:C.teal   },
-                  ].map(({ label, tranche, tarif, color }) => (
-                    <div key={label} style={{ background:color+"11", borderRadius:12, padding:"16px", border:"1px solid "+color+"33", textAlign:"center" }}>
-                      <p style={{ fontSize:13, fontWeight:700, color, marginBottom:4 }}>{label}</p>
-                      <p style={{ fontSize:11, color:C.textMuted, marginBottom:8 }}>{tranche}</p>
-                      <p style={{ fontSize:22, fontWeight:800, color }}>{(tarif/1000).toFixed(0)}k GNF</p>
+
+                {/* Activité hebdomadaire */}
+                <div style={{ background:C.white, borderRadius:16, border:"1px solid "+C.border, overflow:"hidden" }}>
+                  <div style={{ padding:"18px 20px", borderBottom:"1px solid "+C.border }}>
+                    <p style={{ fontSize:15, fontWeight:700, color:C.textPri }}>Activité Hebdomadaire</p>
+                    <p style={{ fontSize:12, color:C.textMuted, marginTop:2 }}>Paiements encaissés · semaine en cours</p>
+                  </div>
+                  <div style={{ padding:"20px" }}>
+                    <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:160, paddingLeft:40, paddingBottom:24, position:"relative" }}>
+                      <div style={{ position:"absolute", left:0, right:0, bottom:24, top:0, pointerEvents:"none" }}>
+                        {[0, Math.ceil(maxHebo/2), maxHebo].map(v => {
+                          const y = (1 - v/maxHebo) * 136
+                          return <span key={v} style={{ position:"absolute", left:0, top:y, fontSize:10, color:C.textMuted, transform:"translateX(-100%)" }}>{v}</span>
+                        })}
+                      </div>
+                      {JOURS.map((j,i) => {
+                        const v = activiteHebo[i]
+                        const h = v > 0 ? Math.max((v/maxHebo) * 136, 8) : 4
+                        const isToday = i === (new Date().getDay()||7) - 1
+                        return (
+                          <div key={j} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                            {v > 0 && <span style={{ fontSize:11, fontWeight:700, color:C.green }}>{v}</span>}
+                            <div style={{ width:"100%", maxWidth:40, height:h, background:isToday ? C.green : v > 0 ? "#86efac" : "#e5e7eb", borderRadius:"6px 6px 0 0", transition:"height .35s ease" }} />
+                            <span style={{ fontSize:10, color:isToday ? C.green : C.textMuted, fontWeight:isToday ? 700 : 400 }}>{j}</span>
+                          </div>
+                        )
+                      })}
                     </div>
-                  ))}
+                  </div>
+                </div>
+
+                {/* Répartition par type + Taux de recouvrement */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+                  <div style={{ background:C.white, borderRadius:16, border:"1px solid "+C.border, padding:"20px 24px" }}>
+                    <p style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>Répartition par Type</p>
+                    {[
+                      { label:"Consultations payées", nb:toutesLignes.filter(l=>l.paye&&l.typeFacture==="consultation").length, color:C.green },
+                      { label:"Examens payés", nb:toutesLignes.filter(l=>l.paye&&l.typeFacture==="examens").length, color:C.blue },
+                      { label:"En attente", nb:nbAttente, color:C.red },
+                    ].map(({ label, nb, color }) => {
+                      const total = toutesLignes.length || 1
+                      return (
+                        <div key={label} style={{ marginBottom:12 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                            <span style={{ fontSize:13, color:C.textSec }}>{label}</span>
+                            <span style={{ fontSize:13, fontWeight:700, color }}>{nb}</span>
+                          </div>
+                          <div style={{ height:8, borderRadius:4, background:"#e5e7eb", overflow:"hidden" }}>
+                            <div style={{ height:"100%", width:`${(nb/total)*100}%`, background:color, borderRadius:4, transition:"width .5s" }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ background:C.white, borderRadius:16, border:"1px solid "+C.border, padding:"20px 24px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+                    <p style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>Taux de Recouvrement</p>
+                    <p style={{ fontSize:52, fontWeight:800, color:C.teal, letterSpacing:"-2px", lineHeight:1 }}>
+                      {(totalAEncaisser+totalEncaisse) > 0 ? Math.round((totalEncaisse/(totalAEncaisser+totalEncaisse))*100) : 0}%
+                    </p>
+                    <p style={{ fontSize:13, color:C.textMuted, marginTop:8 }}>{fmtMoney(totalEncaisse)} / {fmtMoney(totalAEncaisser+totalEncaisse)}</p>
+                  </div>
+                </div>
+
+                {/* Grille tarifaire */}
+                <div style={{ background:C.white, borderRadius:16, border:"1px solid "+C.border, padding:"20px 24px" }}>
+                  <p style={{ fontSize:15, fontWeight:700, marginBottom:14 }}>Grille Tarifaire — Consultation</p>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12 }}>
+                    {[
+                      { label:"Nourrisson", tranche:"< 5 ans",    tarif:30000, color:C.purple },
+                      { label:"Enfant",     tranche:"5 – 14 ans", tarif:35000, color:C.blue   },
+                      { label:"Adulte",     tranche:"15 – 60 ans",tarif:50000, color:C.green  },
+                      { label:"Senior",     tranche:"> 60 ans",   tarif:40000, color:C.teal   },
+                    ].map(({ label, tranche, tarif, color }) => (
+                      <div key={label} style={{ background:color+"11", borderRadius:12, padding:"16px", border:"1px solid "+color+"33", textAlign:"center" }}>
+                        <p style={{ fontSize:13, fontWeight:700, color, marginBottom:4 }}>{label}</p>
+                        <p style={{ fontSize:11, color:C.textMuted, marginBottom:8 }}>{tranche}</p>
+                        <p style={{ fontSize:22, fontWeight:800, color }}>{(tarif/1000).toFixed(0)}k GNF</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
         </main>
       </div>

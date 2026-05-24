@@ -25,9 +25,9 @@ app.use("/api/patients",      require("./routes/patients"))
 app.use("/api/file",          require("./routes/file"))
 app.use("/api/consultations", require("./routes/consultations"))
 app.use("/api/notifications", require("./routes/notifications"))
-// 🔜 Prochaines routes :
 app.use("/api/rdv",          require("./routes/rdv"))
-// app.use("/api/labo",       require("./routes/labo"))
+app.use("/api/labo",         require("./routes/labo"))
+// 🔜 Prochaines routes :
 // app.use("/api/soins",      require("./routes/soins"))
 // app.use("/api/parametres", require("./routes/parametres"))
 

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { useAuth, AuthProvider } from "./hooks/useAuth.jsx"
+import { ToastProvider } from "./components/Toast.jsx"
 import Login from "./pages/auth/Login"
 import DashboardSecretaire from "./pages/auth/DashbordSecretaire"
 import DashboardMedecinChef from "./pages/auth/DashboardMedecinChef"
@@ -55,11 +56,13 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ClinicSettingsProvider>
-          <SharedDataProvider>
-            <AppRoutes />
-          </SharedDataProvider>
-        </ClinicSettingsProvider>
+        <ToastProvider>
+          <ClinicSettingsProvider>
+            <SharedDataProvider>
+              <AppRoutes />
+            </SharedDataProvider>
+          </ClinicSettingsProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )
