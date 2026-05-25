@@ -1,4 +1,5 @@
 const pool = require("../config/db")
+const { v4: uuidv4 } = require('uuid')
 
 // ── Générer un PID unique ────────────────────────────────
 const genPid = async () => {
@@ -10,13 +11,13 @@ const genPid = async () => {
 }
 
 // ────────────────────────────────────────────────────────
-//  GET /api/patients  — liste tous les patients
+//  GET /api/patients  — liste tous les patients (avec UUID)
 // ────────────────────────────────────────────────────────
 const listerPatients = async (req, res) => {
   const { q } = req.query
   try {
     let query = `
-      SELECT id, pid, nom, date_naissance, sexe, telephone,
+      SELECT id, uuid, pid, nom, date_naissance, sexe, telephone,
              quartier, secteur, profession, responsable, created_at
       FROM patients
     `
@@ -37,16 +38,23 @@ const listerPatients = async (req, res) => {
 }
 
 // ────────────────────────────────────────────────────────
-//  GET /api/patients/:id
+//  GET /api/patients/:id  — par ID ou UUID
 // ────────────────────────────────────────────────────────
 const getPatient = async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, pid, nom, date_naissance, sexe, telephone,
-              quartier, secteur, profession, responsable, created_at
-       FROM patients WHERE id = $1`,
-      [req.params.id]
-    )
+    const { id } = req.params
+    // Vérifier si c'est un UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    
+    const query = isUuid
+      ? `SELECT id, uuid, pid, nom, date_naissance, sexe, telephone,
+                quartier, secteur, profession, responsable, created_at
+         FROM patients WHERE uuid = $1`
+      : `SELECT id, uuid, pid, nom, date_naissance, sexe, telephone,
+                quartier, secteur, profession, responsable, created_at
+         FROM patients WHERE id = $1`
+
+    const { rows } = await pool.query(query, [id])
     if (rows.length === 0)
       return res.status(404).json({ success: false, message: "Patient introuvable." })
     return res.json({ success: true, patient: rows[0] })
@@ -57,7 +65,7 @@ const getPatient = async (req, res) => {
 }
 
 // ────────────────────────────────────────────────────────
-//  POST /api/patients  — créer un patient
+//  POST /api/patients  — créer un patient (avec UUID auto)
 // ────────────────────────────────────────────────────────
 const creerPatient = async (req, res) => {
   const { nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable } = req.body
@@ -83,7 +91,7 @@ const creerPatient = async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO patients (pid, nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, pid, nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable, created_at`,
+       RETURNING id, uuid, pid, nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable, created_at`,
       [pid, nom.trim(), date_naissance || null, sexe || null, telephone || null,
        quartier || null, secteur || null, profession || null, responsable || null]
     )
@@ -95,24 +103,48 @@ const creerPatient = async (req, res) => {
 }
 
 // ────────────────────────────────────────────────────────
-//  PUT /api/patients/:id  — modifier un patient
+//  PUT /api/patients/:id  — modifier un patient (par ID ou UUID)
 // ────────────────────────────────────────────────────────
 const modifierPatient = async (req, res) => {
   const { nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable } = req.body
+  const { id } = req.params
+  
   try {
-    const { rows } = await pool.query(
-      `UPDATE patients SET
-         nom=$1, date_naissance=$2, sexe=$3, telephone=$4,
-         quartier=$5, secteur=$6, profession=$7, responsable=$8,
-         updated_at=NOW()
-       WHERE id=$9
-       RETURNING id, pid, nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable`,
-      [nom, date_naissance || null, sexe || null, telephone || null,
-       quartier || null, secteur || null, profession || null, responsable || null,
-       req.params.id]
-    )
+    // Vérifier si c'est un UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    
+    // Vérifier que le patient existe
+    const checkQuery = isUuid
+      ? "SELECT id FROM patients WHERE uuid = $1"
+      : "SELECT id FROM patients WHERE id = $1"
+    
+    const checkResult = await pool.query(checkQuery, [id])
+    if (checkResult.rows.length === 0)
+      return res.status(404).json({ success: false, message: "Patient introuvable." })
+
+    const updateQuery = isUuid
+      ? `UPDATE patients SET
+           nom=$1, date_naissance=$2, sexe=$3, telephone=$4,
+           quartier=$5, secteur=$6, profession=$7, responsable=$8,
+           updated_at=NOW()
+         WHERE uuid=$9
+         RETURNING id, uuid, pid, nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable, created_at, updated_at`
+      : `UPDATE patients SET
+           nom=$1, date_naissance=$2, sexe=$3, telephone=$4,
+           quartier=$5, secteur=$6, profession=$7, responsable=$8,
+           updated_at=NOW()
+         WHERE id=$9
+         RETURNING id, uuid, pid, nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable, created_at, updated_at`
+
+    const { rows } = await pool.query(updateQuery, [
+      nom, date_naissance || null, sexe || null, telephone || null,
+      quartier || null, secteur || null, profession || null, responsable || null,
+      id
+    ])
+    
     if (rows.length === 0)
       return res.status(404).json({ success: false, message: "Patient introuvable." })
+    
     return res.json({ success: true, patient: rows[0] })
   } catch (err) {
     console.error("modifierPatient:", err)
@@ -120,4 +152,32 @@ const modifierPatient = async (req, res) => {
   }
 }
 
-module.exports = { listerPatients, getPatient, creerPatient, modifierPatient }
+// ────────────────────────────────────────────────────────
+//  DELETE /api/patients/:id  — supprimer un patient
+// ────────────────────────────────────────────────────────
+const supprimerPatient = async (req, res) => {
+  const { id } = req.params
+  
+  try {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    
+    const deleteQuery = isUuid
+      ? "DELETE FROM patients WHERE uuid = $1 RETURNING id, uuid, pid, nom"
+      : "DELETE FROM patients WHERE id = $1 RETURNING id, uuid, pid, nom"
+
+    const { rows } = await pool.query(deleteQuery, [id])
+    
+    if (rows.length === 0)
+      return res.status(404).json({ success: false, message: "Patient introuvable." })
+    
+    return res.json({ 
+      success: true, 
+      message: `Patient ${rows[0].nom} (${rows[0].pid}) supprimé avec succès.` 
+    })
+  } catch (err) {
+    console.error("supprimerPatient:", err)
+    return res.status(500).json({ success: false, message: "Erreur serveur." })
+  }
+}
+
+module.exports = { listerPatients, getPatient, creerPatient, modifierPatient, supprimerPatient }
