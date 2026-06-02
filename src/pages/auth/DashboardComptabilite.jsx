@@ -9,10 +9,8 @@ const calcAge = d => { if(!d) return 0; return Math.floor((Date.now()-new Date(d
 
 function tarifParAge(dateNaissance, s={}) {
   const age = calcAge(dateNaissance)
-  if (age < 5)  return { montant: s.tarifNourrisson||30000, label:"Nourrisson (< 5 ans)" }
-  if (age < 15) return { montant: s.tarifEnfant||35000,     label:"Enfant (5–14 ans)" }
-  if (age < 61) return { montant: s.tarifAdulte||50000,     label:"Adulte (15–60 ans)" }
-  return { montant: s.tarifSenior||40000, label:"Senior (> 60 ans)" }
+  if (age <= 15) return { montant: s.tarifEnfant || 15000, label:"Enfant (0–15 ans)" }
+  return { montant: s.tarifAdulte || 20000, label:"> 15 ans" }
 }
 
 const C = {
@@ -59,7 +57,9 @@ function Badge({ statut }) {
 function ModalPaiementConsultation({ entree, patient, onClose, onSave }) {
   const { settings } = useClinicSettings()
   const tarif = tarifParAge(patient?.dateNaissance, settings)
-  const montantDu = entree.montantConsultation || tarif.montant
+  const montantDu = (entree.montantConsultation !== undefined && entree.montantConsultation !== null)
+    ? Number(entree.montantConsultation)
+    : tarif.montant
   const [methode, setMethode] = useState("cash")
   const [note,    setNote]    = useState("")
   return (
@@ -102,7 +102,7 @@ function ModalPaiementConsultation({ entree, patient, onClose, onSave }) {
               style={{ flex:1,padding:"11px",border:"1.5px solid "+C.border,borderRadius:10,background:C.white,color:C.textSec,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>
               Annuler
             </button>
-            <button onClick={()=>onSave({ statut:"paye", montant:montantDu, methode, note, date:new Date().toLocaleDateString("fr-FR") })}
+            <button onClick={()=>onSave({ statut:"paye", montant:Number(montantDu) || tarif.montant, methode, note, date:new Date().toLocaleDateString("fr-FR") })}
               style={{ flex:2,padding:"11px",border:"none",borderRadius:10,background:C.green,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit" }}>
               Confirmer ({fmtMoney(montantDu)})
             </button>
@@ -297,15 +297,22 @@ export default function DashboardComptabilite() {
   fileEnrichie.forEach(f => {
     const rdv = f.typeVisite === "rendez_vous"
     if (!rdv) {
-      toutesLignes.push({
-        key: f.id + "_c",
-        ...f,
-        typeFacture: "consultation",
-        montantFacture: f.montantConsultation || tarifParAge(f.dateNaissance, settings).montant,
-        paye: f.paiementConsultation?.statut === "paye",
-        statutLigne: f.paiementConsultation?.statut === "paye" ? "paye" : "en_attente",
-        paiementInfo: f.paiementConsultation,
-      })
+      const montantFact = (f.montantConsultation !== undefined && f.montantConsultation !== null)
+        ? Number(f.montantConsultation)
+        : tarifParAge(f.dateNaissance, settings).montant
+
+      // N'ajouter en caisse que les consultations avec un montant > 0
+      if (montantFact > 0) {
+        toutesLignes.push({
+          key: f.id + "_c",
+          ...f,
+          typeFacture: "consultation",
+          montantFacture: montantFact,
+          paye: f.paiementConsultation?.statut === "paye",
+          statutLigne: f.paiementConsultation?.statut === "paye" ? "paye" : "en_attente",
+          paiementInfo: f.paiementConsultation,
+        })
+      }
     }
     if ((f.fraisExamens || 0) > 0) {
       const montantPayeEx = f.paiementExamens?.montantPaye || 0
@@ -705,9 +712,9 @@ export default function DashboardComptabilite() {
                   <div style={{ padding:"20px" }}>
                     <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:160, paddingLeft:40, paddingBottom:24, position:"relative" }}>
                       <div style={{ position:"absolute", left:0, right:0, bottom:24, top:0, pointerEvents:"none" }}>
-                        {[0, Math.ceil(maxHebo/2), maxHebo].map(v => {
+                        {[0, Math.ceil(maxHebo/2), maxHebo].map((v, idx) => {
                           const y = (1 - v/maxHebo) * 136
-                          return <span key={v} style={{ position:"absolute", left:0, top:y, fontSize:10, color:C.textMuted, transform:"translateX(-100%)" }}>{v}</span>
+                          return <span key={`axis-${idx}-${v}`} style={{ position:"absolute", left:0, top:y, fontSize:10, color:C.textMuted, transform:"translateX(-100%)" }}>{v}</span>
                         })}
                       </div>
                       {JOURS.map((j,i) => {
@@ -765,8 +772,8 @@ export default function DashboardComptabilite() {
                     {[
                       { label:"Nourrisson", tranche:"< 5 ans",    tarif:30000, color:C.purple },
                       { label:"Enfant",     tranche:"5 – 14 ans", tarif:35000, color:C.blue   },
-                      { label:"Adulte",     tranche:"15 – 60 ans",tarif:50000, color:C.green  },
-                      { label:"Senior",     tranche:"> 60 ans",   tarif:40000, color:C.teal   },
+                      { label:"0 – 15 ans", tranche:"0 – 15 ans", tarif:15000, color:C.blue  },
+                      { label:"> 15 ans",    tranche:"> 15 ans",    tarif:20000, color:C.green },
                     ].map(({ label, tranche, tarif, color }) => (
                       <div key={label} style={{ background:color+"11", borderRadius:12, padding:"16px", border:"1px solid "+color+"33", textAlign:"center" }}>
                         <p style={{ fontSize:13, fontWeight:700, color, marginBottom:4 }}>{label}</p>

@@ -98,6 +98,7 @@ const creerPatient = async (req, res) => {
     return res.status(201).json({ success: true, patient: rows[0] })
   } catch (err) {
     console.error("creerPatient:", err)
+    // Ne pas exposer le message d'erreur interne en production
     return res.status(500).json({ success: false, message: "Erreur serveur." })
   }
 }

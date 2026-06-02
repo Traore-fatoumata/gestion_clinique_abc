@@ -24,6 +24,7 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
     plaintes:              consultation?.plaintes            || consultation?.observations || "",
     antecedents:           consultation?.antecedents         || "",
     poids:                 consultation?.poids               || "",
+    montantConsultation:   consultation?.montantConsultation ?? patient?.montantConsultation ?? "",
     diagPresomption:       consultation?.diagPresomption     || consultation?.symptomes || "",
     diagDefinitif:         (consultation?.diagDefinitif      || consultation?.diagnostics || []).join(", "),
     pathologies:           (consultation?.pathologies||[]).join(", "),
@@ -96,6 +97,7 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
     const data = {
       motif:            form.motif,
       plaintes:         form.plaintes,
+      montantConsultation: form.montantConsultation ? Number(form.montantConsultation) : undefined,
       antecedents:      form.antecedents,
       poids:            form.poids,
       diagPresomption:  form.diagPresomption,
@@ -400,6 +402,13 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
                 style={{ ...inputSt, resize:"none" }}
                 onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
             </div>
+          </div>
+
+          {/* Montant consultation — modifiable par le médecin */}
+          <div>
+            <label style={labelSt}>Montant de la consultation (GNF)</label>
+            <input type="number" value={form.montantConsultation} onChange={e=>f("montantConsultation", e.target.value)} placeholder="Laisser vide pour tarif par défaut"
+              style={{ ...inputSt }} onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
           </div>
 
           {/* Diagnostic de présomption + suggestions auto */}

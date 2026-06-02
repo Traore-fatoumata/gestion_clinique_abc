@@ -38,12 +38,10 @@ export const DOCTEURS = [
 
 
 export function tarifParAge(dateNaissance, s={}) {
-  if (!dateNaissance) return s.tarifAdulte || 50000
+  if (!dateNaissance) return s.tarifAdulte || 20000
   const age = Math.floor((Date.now() - new Date(dateNaissance)) / (365.25*24*3600*1000))
-  if (age < 5)   return s.tarifNourrisson || 30000
-  if (age < 15)  return s.tarifEnfant     || 35000
-  if (age <= 60) return s.tarifAdulte     || 50000
-  return s.tarifSenior || 40000
+  if (age <= 15) return s.tarifEnfant || 15000
+  return s.tarifAdulte || 20000
 }
 
 // ══════════════════════════════════════════════════════

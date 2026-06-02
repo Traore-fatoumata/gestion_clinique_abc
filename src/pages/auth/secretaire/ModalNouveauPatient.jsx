@@ -124,10 +124,8 @@ export default function ModalNouveauPatient({ onClose, onEnregistrer }) {
               <div style={{ background:C.greenSoft,borderRadius:14,padding:"16px 18px",border:"1px solid "+C.green+"44" }}>
                 <p style={{ fontSize:11,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10 }}>Tarif selon l'âge</p>
                 {[
-                  { label:"Nourrisson (< 5 ans)",  montant:30000 },
-                  { label:"Enfant (5 – 14 ans)",   montant:35000 },
-                  { label:"Adulte (15 – 60 ans)",  montant:50000 },
-                  { label:"Senior (> 60 ans)",     montant:40000 },
+                  { label:"0 – 15 ans", sub:"0 à 15 ans", montant:15000 },
+                  { label:"> 15 ans",    sub:"Plus de 15 ans", montant:20000 },
                 ].map(t=>(
                   <div key={t.label} onClick={()=>setF("montantConsultation",t.montant.toString())}
                     style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 8px",borderRadius:8,cursor:"pointer",

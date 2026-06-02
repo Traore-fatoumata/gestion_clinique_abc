@@ -1,4 +1,4 @@
-# Clinique Marouane - Système de Gestion Médicale
+# Clinique SantéPro - Système de Gestion Médicale Professionnel
 
 Un système de gestion complet pour cliniques médicales, développé avec React et Node.js.
 
@@ -56,7 +56,7 @@ Un système de gestion complet pour cliniques médicales, développé avec React
 ### 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/Traore-fatoumata/gestion_clinique_abc.git
+git clone https://github.com/votre-organisation/clinique-santepro.git
 cd gestion_clinique
 ```
 
@@ -107,7 +107,7 @@ npm run build
 PORT=3001
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=clinique_marouane
+DB_NAME=clinique_santepro
 DB_USER=postgres
 DB_PASSWORD=votre_mot_de_passe
 JWT_SECRET=votre_secret_jwt_tres_long

@@ -4,7 +4,7 @@ import { useClinicSettings } from "../../hooks/useClinicSettings.jsx"
 import { useAuth } from "../../hooks/useAuth.jsx"
 import { useNavigate } from "react-router-dom"
 import { useSharedData } from "../../hooks/useSharedData.jsx"
-import { C, Card, CardHeader, Btn, Avatar, DOCTEURS, genId, today, nowTime, fmt, tarifParAge } from "./secretaire/shared.jsx"
+import { C, Card, CardHeader, Btn, Avatar, DOCTEURS, today, nowTime, fmt, tarifParAge } from "./secretaire/shared.jsx"
 import ModalNouveauPatient from "./secretaire/ModalNouveauPatient.jsx"
 import ModalRechercheDossier from "./secretaire/ModalRechercheDossier.jsx"
 import ModalPermission from "./secretaire/ModalPermission.jsx"
@@ -60,31 +60,55 @@ export default function DashboardSecretaire() {
 
   const nonLues = notifications.filter(n=>!n.lu).length
 
-  const handleEnregistrer = (form) => {
+  const handleEnregistrer = async (form) => {
     const fullNom = form.nom.trim()+" "+form.prenom.trim()
     const existing = patients.find(p=>p.nom.toLowerCase()===fullNom.toLowerCase())
     if (existing) {
       alert(""+fullNom+" est déjà enregistré ("+existing.pid+"). Utilisez 'Rechercher dossier' pour le signaler au médecin chef.")
       setShowNouveau(false); return
     }
+
     let age=form.age||""
     if (!age&&form.dateNaissance) { const a=Math.floor((Date.now()-new Date(form.dateNaissance))/(365.25*24*3600*1000)); age=a+" ans" }
+
     const nouveau={
-      id:Date.now(), pid:genId(Date.now()%999999),
-      nom:fullNom, age, dateNaissance:form.dateNaissance, sexe:form.sexe,
-      telephone:form.telephone, quartier:form.quartier, secteur:form.secteur,
-      profession:form.profession, responsable:form.responsable,
+      nom:fullNom,
+      dateNaissance:form.dateNaissance,
+      sexe:form.sexe,
+      telephone:form.telephone,
+      quartier:form.quartier,
+      secteur:form.secteur,
+      profession:form.profession,
+      responsable:form.responsable,
     }
-    addPatient(nouveau)
-    addToFile({ patientId:nouveau.id, pid:nouveau.pid, nom:nouveau.nom, arrivee:nowTime(), typeVisite:"consultation", statut:"en_attente", montantConsultation:parseInt(form.montantConsultation)||tarifParAge(form.dateNaissance, settings), paiementConsultation:null })
-    setShowNouveau(false)
-    alert(""+fullNom+" enregistré et ajouté à la file du médecin chef.")
+
+    try {
+      const createdPatient = await addPatient(nouveau)
+      const parsedMont = parseInt(form.montantConsultation, 10)
+      const montantForFile = Number.isFinite(parsedMont) ? parsedMont : tarifParAge(form.dateNaissance, settings)
+      await addToFile({
+        patientId: createdPatient.id,
+        pid: createdPatient.pid,
+        nom: createdPatient.nom,
+        arrivee: nowTime(),
+        typeVisite: "consultation",
+        statut: "en_attente",
+        montantConsultation: montantForFile,
+        paiementConsultation: null,
+      })
+      setShowNouveau(false)
+      alert(""+fullNom+" enregistré et ajouté à la file du médecin chef.")
+    } catch (err) {
+      console.error("Erreur enregistrement patient:", err)
+      alert("Impossible d'enregistrer le patient. Réessayez.")
+    }
   }
 
   const handleSignaler = (patient, montant, rdv) => {
     const deja = file.find(f=>f.patientId===patient.id && f.statut !== "termine")
     if (deja) { alert(patient.nom+" est déjà dans la file d'attente."); return }
-    const montantConsult = montant || tarifParAge(patient.dateNaissance, settings)
+    const parsed = typeof montant === "string" ? parseInt(montant, 10) : Number(montant)
+    const montantConsult = Number.isFinite(parsed) ? parsed : tarifParAge(patient.dateNaissance, settings)
     addToFile({
       patientId: patient.id,
       pid: patient.pid,

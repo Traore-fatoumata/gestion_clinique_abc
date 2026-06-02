@@ -106,12 +106,10 @@ export default function ModalRechercheDossier({ patients, rdvs, onClose, onSigna
             </div>
 
             {/* Grille tarifaire cliquable */}
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:20 }}>
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:20 }}>
               {[
-                { label:"Nourrisson",  sub:"< 5 ans",    montant:30000 },
-                { label:"Enfant",      sub:"5 – 14 ans", montant:35000 },
-                { label:"Adulte",      sub:"15 – 60 ans",montant:50000 },
-                { label:"Senior",      sub:"> 60 ans",   montant:40000 },
+                { label:"0 – 15 ans", sub:"0 à 15 ans", montant:15000 },
+                { label:"> 15 ans",    sub:"Plus de 15 ans", montant:20000 },
               ].map(t=>(
                 <div key={t.label} onClick={()=>setMontant(t.montant.toString())}
                   style={{ padding:"10px 8px",borderRadius:10,border:"2px solid "+(montant===t.montant.toString()?C.green:C.border),

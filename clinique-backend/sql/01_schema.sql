@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
 -- ── PATIENTS ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS patients (
   id              SERIAL PRIMARY KEY,
+  uuid            UUID DEFAULT gen_random_uuid() UNIQUE,
   pid             VARCHAR(20) UNIQUE NOT NULL,       -- ex: P-123456
   nom             VARCHAR(120) NOT NULL,
   date_naissance  DATE,

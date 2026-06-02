@@ -1,8 +1,9 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { useAuth } from "./useAuth"
 
 const SharedDataContext = createContext(null)
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
 export function SharedDataProvider({ children }) {
   const { getToken, user } = useAuth()
@@ -40,11 +41,11 @@ export function SharedDataProvider({ children }) {
     try {
       const today = new Date().toISOString().slice(0, 10)
       const [patientsRes, fileRes, consultsRes, notifsRes, rdvRes] = await Promise.allSettled([
-        apiFetch("/patients"),
-        apiFetch(`/file?date=${today}`),
-        apiFetch("/consultations"),
-        apiFetch("/notifications"),
-        apiFetch("/rdv"),
+        apiFetch("/api/patients"),
+        apiFetch(`/api/file?date=${today}`),
+        apiFetch("/api/consultations"),
+        apiFetch("/api/notifications"),
+        apiFetch("/api/rdv"),
       ])
       if (patientsRes.status === "fulfilled") setPatients(patientsRes.value.patients || [])
       if (fileRes.status      === "fulfilled") setFile(fileRes.value.file || [])
@@ -58,16 +59,37 @@ export function SharedDataProvider({ children }) {
     }
   }, [user, apiFetch])
 
+  // Réinitialiser les données côté frontend (mode test)
+  const resetAppDataForTest = useCallback(() => {
+    setPatients([])
+    setFile([])
+    setConsultations([])
+    setRdv([])
+    setNotifs([])
+    setResultatsLabo([])
+    setSoins([])
+    // Effacer quelques clés locales connues si présentes
+    try {
+      localStorage.removeItem('clinique_medecins_presence')
+      localStorage.removeItem('clinique_historique_presence')
+      // Ne supprime pas settings ni token — seulement données patients/test
+    } catch {
+      // Ignorer si l'accès au localStorage échoue dans certains environnements.
+    }
+  }, [])
+
   useEffect(() => {
     if (!user) return
-    chargerDonnees()
-    pollRef.current = setInterval(chargerDonnees, 30_000)
+    const load = async () => { await chargerDonnees() }
+    load()
+    // Poll less frequently to avoid triggering backend rate limits
+    pollRef.current = setInterval(chargerDonnees, 60_000)
     return () => clearInterval(pollRef.current)
   }, [user, chargerDonnees])
 
   // ── PATIENTS ────────────────────────────────────────────
   const addPatient = useCallback(async (data) => {
-    const res = await apiFetch("/patients", {
+    const res = await apiFetch("/api/patients", {
       method: "POST",
       body: JSON.stringify({
         nom:            data.nom,
@@ -86,7 +108,10 @@ export function SharedDataProvider({ children }) {
 
   // ── FILE D'ATTENTE ──────────────────────────────────────
   const addToFile = useCallback(async (data) => {
-    const res = await apiFetch("/file", {
+    const montantConsultation = Number.isFinite(data.montantConsultation)
+      ? Number(data.montantConsultation)
+      : 0
+    const res = await apiFetch("/api/file", {
       method: "POST",
       body: JSON.stringify({
         patient_id:           data.patientId,
@@ -94,7 +119,7 @@ export function SharedDataProvider({ children }) {
         type_visite:          data.typeVisite || "consultation",
         motif:                data.motif || null,
         service:              data.service || null,
-        montant_consultation: data.montantConsultation || 0,
+        montant_consultation: montantConsultation,
         type_consultation:    data.typeConsultation || "standard",
         rdv_id:               data.rdvId || null,
       }),
@@ -117,6 +142,10 @@ export function SharedDataProvider({ children }) {
     if (data.fraisExamens !== undefined) {
       payload.frais_examens     = data.fraisExamens
       payload.examens_commandes = (data.examensCommandes || []).map(e => ({ nom: e.nom, prix: e.prix || 0 }))
+    }
+    // Montant consultation (possibilité de modifier le tarif depuis la consultation complète)
+    if (data.montantConsultation !== undefined) {
+      payload.montant_consultation = Number(data.montantConsultation || 0)
     }
     if (data.examensCommandes !== undefined && data.fraisExamens === undefined) {
       payload.examens_commandes = data.examensCommandes.map(e => ({ nom: e.nom, prix: e.prix || 0 }))
@@ -142,7 +171,7 @@ export function SharedDataProvider({ children }) {
       }
     }
 
-    await apiFetch(`/file/${fileId}`, { method: "PATCH", body: JSON.stringify(payload) })
+    await apiFetch(`/api/file/${fileId}`, { method: "PATCH", body: JSON.stringify(payload) })
 
     // Mise à jour locale optimiste
     setFile(prev => prev.map(f => f.id === fileId ? {
@@ -158,7 +187,7 @@ export function SharedDataProvider({ children }) {
 
   // ── CONSULTATIONS ───────────────────────────────────────
   const addConsultation = useCallback(async (data) => {
-    const res = await apiFetch("/consultations", {
+    const res = await apiFetch("/api/consultations", {
       method: "POST",
       body: JSON.stringify({
         patient_id:        data.patientId,
@@ -184,7 +213,7 @@ export function SharedDataProvider({ children }) {
 
   // ── RDV ─────────────────────────────────────────────────
   const addRdv = useCallback(async (data) => {
-    const res = await apiFetch("/rdv", {
+    const res = await apiFetch("/api/rdv", {
       method: "POST",
       body: JSON.stringify({
         patient_id: data.patientId,
@@ -203,18 +232,18 @@ export function SharedDataProvider({ children }) {
     const payload = {}
     if (data.rappelEnvoye !== undefined) payload.rappel_envoye = data.rappelEnvoye
     if (data.statut !== undefined)       payload.statut        = data.statut
-    await apiFetch(`/rdv/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+    await apiFetch(`/api/rdv/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
     setRdv(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
   }, [apiFetch])
 
   const removeRdv = useCallback(async (id) => {
-    await apiFetch(`/rdv/${id}`, { method: "DELETE" })
+    await apiFetch(`/api/rdv/${id}`, { method: "DELETE" })
     setRdv(prev => prev.filter(r => r.id !== id))
   }, [apiFetch])
 
   // ── NOTIFICATIONS ───────────────────────────────────────
   const addNotif = useCallback(async (data) => {
-    await apiFetch("/notifications", {
+    await apiFetch("/api/notifications", {
       method: "POST",
       body: JSON.stringify({
         docteur_id:  data.docteurId,
@@ -225,19 +254,19 @@ export function SharedDataProvider({ children }) {
       }),
     })
     if (data.docteurId === user?.id) {
-      const res = await apiFetch("/notifications")
+      const res = await apiFetch("/api/notifications")
       setNotifs(res.notifications || [])
     }
   }, [apiFetch, user])
 
   const marquerNotifLue = useCallback(async (id) => {
-    await apiFetch(`/notifications/${id}/lue`, { method: "PATCH" })
+    await apiFetch(`/api/notifications/${id}/lue`, { method: "PATCH" })
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, lu: true } : n))
   }, [apiFetch])
 
   const marquerToutesLues = useCallback(async (docteurId) => {
     if (docteurId !== user?.id) return
-    await apiFetch("/notifications/toutes-lues", { method: "PATCH" })
+    await apiFetch("/api/notifications/toutes-lues", { method: "PATCH" })
     setNotifs(prev => prev.map(n => ({ ...n, lu: true })))
   }, [apiFetch, user])
 
@@ -254,6 +283,8 @@ export function SharedDataProvider({ children }) {
       addRdv, updateRdv, removeRdv,
       addNotif, marquerNotifLue, marquerToutesLues,
       addResultatLabo, updateResultatLabo,
+      // Test helpers
+      resetAppDataForTest,
       rafraichir: chargerDonnees,
     }}>
       {children}

@@ -1,5 +1,12 @@
 const pool = require("../config/db")
 
+const getDefaultConsultationTarif = (dateNaissance) => {
+  if (!dateNaissance) return 20000
+  const birthDate = new Date(dateNaissance)
+  const age = new Date().getFullYear() - birthDate.getFullYear()
+  return age <= 15 ? 15000 : 20000
+}
+
 // ────────────────────────────────────────────────────────
 //  GET /api/file  — file du jour (avec infos patient)
 // ────────────────────────────────────────────────────────
@@ -129,10 +136,32 @@ const ajouterFile = async (req, res) => {
 
     const now = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
     
-    // ── Consultation GRATUITE le vendredi ──
+    // ── Consultation GRATUITE le vendredi uniquement pour la PREMIÈRE consultation du patient ──
     const today = new Date()
     const isFriday = today.getDay() === 5  // 5 = vendredi
-    const finalMontant = isFriday ? 0 : (montant_consultation || 0)
+
+    const { rows: patientRows } = await pool.query(
+      "SELECT date_naissance FROM patients WHERE id=$1",
+      [patient_id]
+    )
+    const dateNaissance = patientRows[0]?.date_naissance || null
+    const rawMontant = Number(montant_consultation)
+    let finalMontant = rawMontant > 0
+      ? rawMontant
+      : type_visite === "consultation"
+        ? getDefaultConsultationTarif(dateNaissance)
+        : 0
+
+    if (isFriday) {
+      const { rows: consults } = await pool.query(
+        `SELECT 1 FROM consultations WHERE patient_id = $1 LIMIT 1`,
+        [patient_id]
+      )
+      const hasPriorConsult = consults.length > 0
+      if (!hasPriorConsult) {
+        finalMontant = 0
+      }
+    }
 
     const { rows } = await pool.query(
       `INSERT INTO file_attente
@@ -166,6 +195,7 @@ const updateFile = async (req, res) => {
     examens_commandes,           // [{nom, prix}]
     paiement_consultation,       // {statut, montant, methode, note}
     paiement_examens,            // {montant_paye, statut, methode, note}
+    montant_consultation,
   } = req.body
 
   const client = await pool.connect()
@@ -180,6 +210,7 @@ const updateFile = async (req, res) => {
     if (statut)     { champs.push(`statut=$${idx++}`);     vals.push(statut) }
     if (medecin_id) { champs.push(`medecin_id=$${idx++}`); vals.push(medecin_id) }
     if (frais_examens !== undefined) { champs.push(`updated_at=NOW()`); }
+    if (montant_consultation !== undefined) { champs.push(`montant_consultation=$${idx++}`); vals.push(montant_consultation) }
 
     if (champs.length > 0) {
       vals.push(req.params.id)

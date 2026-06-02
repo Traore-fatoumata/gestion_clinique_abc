@@ -3,11 +3,28 @@ import { today, C, Card, CardHeader, Avatar, StatutBadge } from "./shared.jsx"
 
 export default function PageAccueil({ consultations, patients, file, setPage }) {
   const { user } = useAuth()
-  const consultAuj   = consultations.filter(c=>c.date===today())
-  const enAttente    = (file || []).filter(f => f.statut !== "termine")
-  const recettesAuj  = consultAuj.filter(c=>c.statut==="paye").reduce((s,c)=>s+c.montant,0)
-  const recettesTot  = consultations.filter(c=>c.statut==="paye").reduce((s,c)=>s+c.montant,0)
-  const recettesMois = consultations.filter(c=>{ const d=new Date(c.date),n=new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()&&c.statut==="paye" }).reduce((s,c)=>s+c.montant,0)
+  const todayStr     = today()
+  const normalizedFile = Array.isArray(file) ? file : []
+  const consultAuj   = consultations.filter(c=>c.date===todayStr)
+  const enAttente    = normalizedFile.filter(f => f.statut !== "termine")
+
+  const payeesConsultAuj = new Set(consultAuj.map(c => `${Number(c.patientId)}|${c.date}`))
+  const recettesAujConsult = consultAuj.reduce((s,c)=>{
+    const matchingFile = normalizedFile.find(f => Number(f.patientId) === Number(c.patientId) && f.dateEntree === c.date)
+    const montantFile = Number(matchingFile?.paiementConsultation?.montant ?? matchingFile?.montantConsultation ?? 0)
+    const montantConsultation = Number(c.montant || 0)
+    return s + (montantConsultation || montantFile)
+  }, 0)
+  const recettesAujFile = normalizedFile.reduce((s,f)=>{
+    if (f.dateEntree !== todayStr) return s
+    const key = `${Number(f.patientId)}|${f.dateEntree}`
+    const paiementConsult = Number(f.paiementConsultation?.montant ?? 0)
+    const paiementExamens = Number(f.paiementExamens?.montantPaye ?? 0)
+    return s + (payeesConsultAuj.has(key) ? 0 : paiementConsult) + paiementExamens
+  }, 0)
+  const recettesAuj  = recettesAujConsult + recettesAujFile
+  const recettesTot  = consultations.filter(c=>c.statut==="paye").reduce((s,c)=>s + Number(c.montant || 0), 0)
+  const recettesMois = consultations.filter(c=>{ const d=new Date(c.date),n=new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()&&c.statut==="paye" }).reduce((s,c)=>s + Number(c.montant || 0), 0)
   const recentes     = [...consultations].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5)
 
   return (
@@ -59,7 +76,7 @@ export default function PageAccueil({ consultations, patients, file, setPage }) 
               const p=patients.find(pt=>pt.id===c.patientId)
               if(!p) return null
               return (
-                <div key={c.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"13px 0",borderBottom:i<recentes.length-1?"1px solid "+C.border:"none" }}>
+                <div key={`${c.id || c.patientId}-${i}`} style={{ display:"flex",alignItems:"center",gap:12,padding:"13px 0",borderBottom:i<recentes.length-1?"1px solid "+C.border:"none" }}>
                   <Avatar name={p.nom} size={36}/>
                   <div style={{ flex:1 }}>
                     <p style={{ fontSize:13,fontWeight:600,color:C.textPri,marginBottom:2 }}>{p.nom}</p>

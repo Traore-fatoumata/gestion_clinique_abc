@@ -9,6 +9,12 @@ export const parametresService = {
     return data
   },
 
+  // Alias compatible avec les anciens appels
+  recupererTous: async () => {
+    const { data } = await api.get(BASE_URL)
+    return data
+  },
+
   // ── Récupérer un paramètre par clé ──────────────────────
   getParametre: async (cle) => {
     const { data } = await api.get(`${BASE_URL}/${cle}`)

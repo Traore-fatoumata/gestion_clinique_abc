@@ -23,7 +23,7 @@ export default function DashboardMedecinChef() {
     patients: sharedPatients, consultations: sharedConsultations,
     addConsultation, updateConsultation, file, updateFileEntry,
     addNotif, resultatsLabo, soins, rdv
-  } = useSharedData()
+  , resetAppDataForTest } = useSharedData()
 
   const [page,         setPage]         = useState("accueil")
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
@@ -38,6 +38,7 @@ export default function DashboardMedecinChef() {
 
   // ── Modal consultation complète (2ème étape quand chef garde le patient) ──
   const [mConsultComplete, setMConsultComplete] = useState(null)
+  const [activeConsultation, setActiveConsultation] = useState(null)
 
   useClinicSettings()
 
@@ -57,18 +58,27 @@ export default function DashboardMedecinChef() {
   const handleValider = (consultId, data) => {
     const ts = new Date().toLocaleString("fr-FR")
     const existing = consultations.find(c => c.id === consultId)
+    const assignedDoctorId = data.docteurId ? Number(data.docteurId) : medecinChef.id
+    const isAssignedToOtherDoctor = data.docteurId && Number(data.docteurId) !== medecinChef.id
+    const consultationPayload = {
+      id: consultId,
+      ...data,
+      docteurId: assignedDoctorId,
+      signePar: user?.nom || "Dr. Doumbouya",
+      signeLe: ts,
+    }
 
     if (existing) {
-      updateConsultation(consultId, { ...data, signePar: user?.nom || "Dr. Doumbouya", signeLe: ts })
+      updateConsultation(consultId, consultationPayload)
     } else {
-      addConsultation({ id: consultId, ...data, signePar: user?.nom || "Dr. Doumbouya", signeLe: ts })
+      addConsultation(consultationPayload)
     }
 
     // Utiliser le fileId fourni directement plutôt que de rechercher dans file
     const fileId = data.fileId
     const entree = fileId ? file.find(f => f.id === fileId) : null
 
-    if (data.docteurId) {
+    if (isAssignedToOtherDoctor) {
       // ── Cas 1 : orienté vers un médecin de service ──
       // Marquer comme terminé et notifier le médecin
       if (entree) {
@@ -121,10 +131,15 @@ export default function DashboardMedecinChef() {
       updateFileEntry(fileId, {
         fraisExamens:    data.fraisExamens,
         examensCommandes: data.examensCommandes,
+        ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
       })
     }
     setMConsultComplete(null)
     alert("Consultation sauvegardée.")
+    // Mode test demandé : vider toutes les données patients/local pour voir l'écran vierge
+    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch {
+      // ignore
+    }
   }
 
   // ── Étape 2 : signer la consultation complète ────────
@@ -158,10 +173,87 @@ export default function DashboardMedecinChef() {
           fraisExamens:    data.fraisExamens,
           examensCommandes: data.examensCommandes,
         }),
+        ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
       })
     }
 
     setMConsultComplete(null)
+    const msg = (data.fraisExamens || 0) > 0
+      ? `Consultation signée. Frais d'examens : ${data.fraisExamens.toLocaleString("fr-FR")} GNF — orienter le patient vers la comptabilité.`
+      : "Consultation signée et validée."
+    alert(msg)
+    // Mode test : vider données frontend
+    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch {
+      // ignore
+    }
+  }
+
+  const handleReprendreConsultation = (consultation) => {
+    const patient = sharedPatients.find(p => p.id === consultation.patientId) || patients.find(p => p.id === consultation.patientId)
+    if (!patient) return
+    setActiveConsultation({ patient, consultation })
+  }
+
+  const handleSauvegarderActiveConsultation = (data) => {
+    if (!activeConsultation) return
+    const { patient, consultation } = activeConsultation
+    addConsultation({
+      patientId:        patient.id,
+      docteurId:        medecinChef.id,
+      date:             consultation.date || today(),
+      service:          medecinChef.specialite,
+      motif:            data.motif,
+      plaintes:         data.plaintes,
+      diagnostics:      data.diagnostics || [],
+      traitements:      data.traitements || [],
+      fraisExamens:     data.fraisExamens || 0,
+      examensCommandes: data.examensCommandes || [],
+      typeConsultation: data.typeConsultation || consultation.typeConsultation || "standard",
+    })
+    const fileEntry = file.find(f => f.patientId === patient.id && f.statut !== "termine")
+    if (fileEntry && (data.fraisExamens || 0) > 0) {
+      updateFileEntry(fileEntry.id, {
+        fraisExamens:    data.fraisExamens,
+        examensCommandes: data.examensCommandes,
+        ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
+      })
+    }
+    setActiveConsultation(null)
+    alert("Consultation sauvegardée.")
+  }
+
+  const handleSignerActiveConsultation = (data) => {
+    if (!activeConsultation) return
+    const { patient, consultation } = activeConsultation
+    const ts = new Date().toLocaleString("fr-FR")
+    addConsultation({
+      patientId:        patient.id,
+      docteurId:        medecinChef.id,
+      date:             consultation.date || today(),
+      service:          medecinChef.specialite,
+      motif:            data.motif,
+      plaintes:         data.plaintes,
+      diagnostics:      data.diagnostics || [],
+      traitements:      data.traitements || [],
+      fraisExamens:     data.fraisExamens || 0,
+      examensCommandes: data.examensCommandes || [],
+      typeConsultation: data.typeConsultation || consultation.typeConsultation || "standard",
+      signe:            true,
+      signeLe:          ts,
+      signePar:         medecinChef.nom,
+    })
+    const fileEntry = file.find(f => f.patientId === patient.id && f.statut !== "termine")
+    if (fileEntry) {
+      updateFileEntry(fileEntry.id, {
+        statut: "termine",
+        ...(((data.fraisExamens || 0) > 0) && {
+          fraisExamens:    data.fraisExamens,
+          examensCommandes: data.examensCommandes,
+        }),
+        ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
+      })
+    }
+    setActiveConsultation(null)
     const msg = (data.fraisExamens || 0) > 0
       ? `Consultation signée. Frais d'examens : ${data.fraisExamens.toLocaleString("fr-FR")} GNF — orienter le patient vers la comptabilité.`
       : "Consultation signée et validée."
@@ -272,6 +364,17 @@ export default function DashboardMedecinChef() {
           onClose={() => setMConsultComplete(null)}
           onSauvegarder={handleSauvegarderComplete}
           onSigner={handleSignerComplete}
+        />
+      )}
+      {activeConsultation && (
+        <ModalConsultation
+          key={`chef-direct-${activeConsultation.consultation.id}-${activeConsultation.patient.id}`}
+          patient={activeConsultation.patient}
+          medecin={medecinChef}
+          consultation={activeConsultation.consultation}
+          onClose={() => setActiveConsultation(null)}
+          onSauvegarder={handleSauvegarderActiveConsultation}
+          onSigner={handleSignerActiveConsultation}
         />
       )}
 
@@ -386,10 +489,10 @@ export default function DashboardMedecinChef() {
       {/* CONTENU */}
       <main style={{ padding: "32px 24px" }}>
         {page === "accueil"       && <PageAccueil       consultations={consultations} patients={patients} file={file} setPage={setPage} />}
-        {page === "consultations" && <PageConsultations consultations={consultations} patients={patients} file={file} medecins={medecins} onValider={handleValider} onModifier={handleModifier} onContinuerConsultation={imprimerOrdonnance} />}
+        {page === "consultations" && <PageConsultations consultations={consultations} patients={patients} file={file} medecins={medecins} onValider={handleValider} onModifier={handleModifier} onContinuerConsultation={imprimerOrdonnance} onReprendreConsultation={handleReprendreConsultation} />}
         {page === "comptes"       && <PageComptes       comptes={comptes} setComptes={setComptes} medecins={medecins} setMedecins={setMedecins} />}
         {page === "presence"      && <PagePresence      medecins={medecins} />}
-        {page === "stats"         && <PageStats         consultations={consultations} patients={patients} />}
+        {page === "stats"         && <PageStats         consultations={consultations} patients={patients} file={file} /> }
         {page === "historique"    && <PageHistorique    consultations={consultations} patients={patients} resultatsLabo={resultatsLabo} soins={soins} rdv={rdv} />}
       </main>
 

@@ -1,40 +1,81 @@
 import { useState } from "react"
 import { today, C, Card, SERVICES, COULEURS } from "./shared.jsx"
 
-export default function PageStats({ consultations, patients }) {
+export default function PageStats({ consultations, patients, file = [] }) {
   const [periode, setPeriode] = useState("mois")
+  const [specificDate, setSpecificDate] = useState("")
   const now = new Date()
 
   const filtreDate = d => {
-    const dp=new Date(d)
-    if(periode==="jour")    return d===today()
-    if(periode==="semaine") { const s=new Date(now); s.setDate(s.getDate()-7); return dp>=s }
-    if(periode==="mois")    { const s=new Date(now); s.setMonth(s.getMonth()-1); return dp>=s }
-    if(periode==="annee")   { const s=new Date(now); s.setFullYear(s.getFullYear()-1); return dp>=s }
+    if (specificDate) return d === specificDate
+    const dp = new Date(d)
+    if (periode==="jour")    return d===today()
+    if (periode==="semaine") { const s=new Date(now); s.setDate(s.getDate()-7); return dp>=s }
+    if (periode==="mois")    { const s=new Date(now); s.setMonth(s.getMonth()-1); return dp>=s }
+    if (periode==="annee")   { const s=new Date(now); s.setFullYear(s.getFullYear()-1); return dp>=s }
     return true
   }
   
   // ── Filtrage par date ──
   const cF            = consultations.filter(c=>filtreDate(c.date))
-  
+  const normalizedFile = Array.isArray(file) ? file : []
+  const patientNames   = Object.fromEntries((patients || []).map(p => [p.id, p.nom]))
+
   // ── STATISTIQUES CONSULTATIONS ──
-  const consultationsPayees = cF.filter(c=>c.statut==="paye")
-  const consultationsEnAttente = cF.filter(c=>c.statut==="en_attente")
-  const totalRecettesConsult = consultationsPayees.reduce((s,c)=>s+(c.montant||0),0)
-  const prixMoyenConsult = consultationsPayees.length>0?Math.round(totalRecettesConsult/consultationsPayees.length):0
+  // Utiliser à la fois les données de `consultations` et la `file` (paiements enregistrés côté file)
+  const enriched = cF.map(c => {
+    const matchingFile = normalizedFile.find(f => Number(f.patientId) === Number(c.patientId) && f.dateEntree === c.date)
+    const montantConsultation = Number(c.montant || 0)
+    const montantFile = Number(matchingFile?.paiementConsultation?.montant ?? matchingFile?.montantConsultation ?? 0)
+    const montant = montantConsultation || montantFile
+    const isPay = c.statut === "paye" || matchingFile?.paiementConsultation?.statut === "paye" || montantFile > 0
+    return {
+      ...c,
+      _isPay: isPay,
+      type: 'consultation',
+      patientName: patientNames[c.patientId] || "Patient",
+      expected: Number(matchingFile?.montantConsultation ?? (c.montant || 0)),
+      paid: montant,
+    }
+  })
+  const consultationsPayees = enriched.filter(c => c._isPay)
+  const consultationsEnAttente = enriched.filter(c => !c._isPay)
+
+  const paidConsultKeys = new Set(enriched.map(c => `${c.patientId}|${c.date}`))
+  // Extraire paiements enregistrés côté "file" — consultations et examens
+  const fileConsultPayments = normalizedFile
+    .filter(f => (f.paiementConsultation?.statut === "paye" || Number(f.paiementConsultation?.montant) > 0)
+      && !paidConsultKeys.has(`${Number(f.patientId)}|${f.dateEntree}`) && filtreDate(f.dateEntree))
+    .map(f => ({
+      type: 'consultation',
+      patientId: f.patientId,
+      patientName: patientNames[f.patientId] || "Patient",
+      date: f.dateEntree,
+      service: f.service || "Consultation",
+      _isPay: true,
+      expected: Number(f.montantConsultation || 0),
+      paid: Number(f.paiementConsultation?.montant ?? f.montantConsultation ?? 0),
+    }))
+
+  const fileExamPayments = normalizedFile
+    .filter(f => Number(f.paiementExamens?.montantPaye) > 0 && filtreDate(f.dateEntree))
+    .map(f => ({
+      type: 'examens',
+      patientId: f.patientId,
+      patientName: patientNames[f.patientId] || "Patient",
+      date: f.dateEntree,
+      service: f.service || 'Examens',
+      _isPay: true,
+      expected: Number(f.fraisExamens || 0),
+      paid: Number(f.paiementExamens?.montantPaye || 0),
+    }))
+
+  const paidRecords = [...consultationsPayees, ...fileConsultPayments, ...fileExamPayments]
+  const totalRecettesConsult = paidRecords.reduce((s,c)=>s+(Number(c.paid)||0),0)
+  const prixMoyenConsult = paidRecords.length>0?Math.round(totalRecettesConsult/paidRecords.length):0
   const tauxPaiementConsult = cF.length>0?Math.round((consultationsPayees.length/cF.length)*100):0
-  
-  // ── STATISTIQUES EXAMENS (séparé) ──
-  // Les examens sont identifiés par la présence de fraisExamens > 0
-  const avecExamens = cF.filter(c=>c.fraisExamens && c.fraisExamens > 0)
-  const examensPayes = avecExamens.filter(c=>c.statutExamens==="paye")
-  const examensEnAttente = avecExamens.filter(c=>c.statutExamens==="en_attente" || c.statutExamens==="partiel")
-  const totalRecettesExamens = examensPayes.reduce((s,c)=>s+(c.montantExamens||0),0)
-  const totalRecettesExamensPartiel = examensEnAttente.reduce((s,c)=>s+(c.montantExamensPaye||0),0)
-  const totalGeneralExamens = avecExamens.reduce((s,c)=>s+(c.fraisExamens||0),0)
-  
+
   // ── TOTAL GENERAL ──
-  const totalGeneral = totalRecettesConsult + totalRecettesExamens + totalRecettesExamensPartiel
   const patientsF     = patients.filter(p=>p.sexe==="F").length
   const patientsM     = patients.filter(p=>p.sexe==="M").length
 
@@ -42,12 +83,17 @@ export default function PageStats({ consultations, patients }) {
   const activiteHebo=JOURS.map((_,i)=>{ const d=new Date(now); d.setDate(d.getDate()-((d.getDay()||7)-1)+i); return consultations.filter(c=>c.date===d.toISOString().slice(0,10)).length })
   const maxHebo=Math.max(...activiteHebo,1)
 
-  const servicesStats=SERVICES.map(s=>({ service:s, nb:cF.filter(c=>c.service===s).length, recettes:consultationsPayees.filter(c=>c.service===s).reduce((sum,c)=>sum+(c.montant||0),0) })).filter(s=>s.nb>0).sort((a,b)=>b.nb-a.nb)
+  const servicesStats = SERVICES.map(s=>{
+    const serviceName = s === 'Laboratoire' ? 'Laboratoire' : s
+    const nb = paidRecords.filter(r=>r.service===serviceName).length
+    const recettes = paidRecords.filter(r=>r.service===serviceName).reduce((sum,r)=>sum+(Number(r.paid)||0),0)
+    return { service: serviceName, nb, recettes }
+  }).filter(s=>s.nb>0).sort((a,b)=>b.nb-a.nb)
 
-  // Graphique courbe recettes (consultations uniquement)
+  // Graphique courbe recettes (consultations + paiements file)
   const ptsCourbe=(periode==="semaine"||periode==="jour")
-    ? JOURS.map((_,i)=>{ const d=new Date(now); d.setDate(d.getDate()-((d.getDay()||7)-1)+i); return { label:JOURS[i], val:consultationsPayees.filter(c=>c.date===d.toISOString().slice(0,10)).reduce((s,c)=>s+(c.montant||0),0) } })
-    : [0,1,2,3,4,5].map(m=>{ const d=new Date(now); d.setMonth(d.getMonth()-5+m); const mo=d.getMonth(),yr=d.getFullYear(); return { label:d.toLocaleDateString("fr-FR",{month:"short"}), val:consultationsPayees.filter(c=>{ const dp=new Date(c.date); return dp.getMonth()===mo&&dp.getFullYear()===yr }).reduce((s,c)=>s+(c.montant||0),0) } })
+    ? JOURS.map((_,i)=>{ const d=new Date(now); d.setDate(d.getDate()-((d.getDay()||7)-1)+i); return { label:JOURS[i], val:paidRecords.filter(c=>c.date===d.toISOString().slice(0,10)).reduce((s,c)=>s+(Number(c.paid)||0),0) } })
+    : [0,1,2,3,4,5].map(m=>{ const d=new Date(now); d.setMonth(d.getMonth()-5+m); const mo=d.getMonth(),yr=d.getFullYear(); return { label:d.toLocaleDateString("fr-FR",{month:"short"}), val:paidRecords.filter(c=>{ const dp=new Date(c.date); return dp.getMonth()===mo&&dp.getFullYear()===yr }).reduce((s,c)=>s+(Number(c.paid)||0),0) } })
   const maxRecette=Math.max(...ptsCourbe.map(p=>p.val),1)
   const W=460,H=160,PL=52,PR=12,PT=12,PB=32,iW=W-PL-PR,iH=H-PT-PB
   const pp=ptsCourbe.map((p,idx)=>({ x:PL+(idx/(ptsCourbe.length-1||1))*iW, y:PT+iH-(p.val/maxRecette)*iH, ...p }))
@@ -68,7 +114,7 @@ export default function PageStats({ consultations, patients }) {
     .slice(0, 12)
 
   // ── Alias pour compatibilité avec le reste du code ──
-  const payees = consultationsPayees
+  const payees = paidRecords
   const enAttente = consultationsEnAttente
   const totalRecettes = totalRecettesConsult
   const tauxPaiement = tauxPaiementConsult
@@ -236,6 +282,12 @@ export default function PageStats({ consultations, patients }) {
   return (
     <div style={{ maxWidth:980, margin:"0 auto" }}>
 
+      {/* Filtre date précise */}
+      <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+        <input type="date" value={specificDate} onChange={e=>setSpecificDate(e.target.value)} style={{ padding:8,borderRadius:8,border:"1px solid #e5e7eb" }} />
+        <button onClick={()=>setSpecificDate("") } style={{ padding:"8px 12px", borderRadius:8, border:"none", background:"#f3f4f6", cursor:"pointer" }}>Effacer</button>
+      </div>
+
       {/* En-tête */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28, flexWrap:"wrap", gap:12 }}>
         <div>
@@ -317,9 +369,9 @@ export default function PageStats({ consultations, patients }) {
               </div>
               <div style={{ position:"absolute",left:34,right:8,bottom:24,height:1,background:C.border }}/>
               {/* Labels axe Y */}
-              {[0,Math.ceil(maxHebo/2),maxHebo].map(v=>{
+              {[0,Math.ceil(maxHebo/2),maxHebo].map((v,i)=>{
                 const y=(1-v/maxHebo)*145
-                return <span key={v} style={{ position:"absolute",left:0,top:y,fontSize:9,color:C.textMuted,lineHeight:1 }}>{v}</span>
+                return <span key={`y-${i}`} style={{ position:"absolute",left:0,top:y,fontSize:9,color:C.textMuted,lineHeight:1 }}>{v}</span>
               })}
             </div>
           </div>
@@ -348,14 +400,14 @@ export default function PageStats({ consultations, patients }) {
                 </g>
               })}
               {/* Labels X */}
-              {pp.map((p,i)=><text key={i} x={p.x} y={H-PB+16} textAnchor="middle" fontSize="9" fill="#9ca3af">{p.label}</text>)}
+              {pp.map((p,i)=><text key={`label-${i}`} x={p.x} y={H-PB+16} textAnchor="middle" fontSize="9" fill="#9ca3af">{p.label}</text>)}
               {/* Aire dégradée */}
               {areaPath&&<defs><linearGradient id="recGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.green} stopOpacity="0.18"/><stop offset="100%" stopColor={C.green} stopOpacity="0"/></linearGradient></defs>}
               {areaPath&&<path d={areaPath} fill="url(#recGrad)"/>}
               {/* Courbe */}
               {pp.length>1&&<path d={pp.map((p,i)=>i===0?`M${p.x},${p.y}`:`L${p.x},${p.y}`).join(" ")} fill="none" stroke={C.green} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>}
               {/* Points */}
-              {pp.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="4.5" fill={C.white} stroke={C.green} strokeWidth="2.5"/>)}
+              {pp.map((p,i)=><circle key={`point-${i}`} cx={p.x} cy={p.y} r="4.5" fill={C.white} stroke={C.green} strokeWidth="2.5"/>)}
             </svg>
           </div>
         </Card>
@@ -463,6 +515,43 @@ export default function PageStats({ consultations, patients }) {
 
       {/* Répartition patients (donut) + Pathologies (barres SVG) */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:16, marginBottom:4 }}>
+
+        {/* Paiements détaillés (consultations + examens) */}
+        <Card>
+          <div style={{ padding:"18px 20px" }}>
+            <p style={{ fontSize:14,fontWeight:700,color:C.textPri,marginBottom:8 }}>Recettes détaillées</p>
+            <p style={{ fontSize:12,color:C.textMuted,marginBottom:12 }}>Liste des paiements enregistrés pour la période / date sélectionnée</p>
+            {payees.length===0 ? (
+              <p style={{ color:C.textMuted,textAlign:"center",padding:"24px 0" }}>Aucun paiement</p>
+            ) : (
+              <div style={{ maxHeight:260, overflowY:"auto" }}>
+                <table style={{ width:"100%",borderCollapse:"collapse" }}>
+                  <thead>
+                    <tr>
+                      <th>Patient</th>
+                      <th>Date</th>
+                      <th>Service</th>
+                      <th>Type</th>
+                      <th style={{ textAlign:"right" }}>Payé (GNF)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payees.map((p,i)=>(
+                      <tr key={`pay-${i}`}>
+                        <td style={{ padding:8 }}>{p.patientName || "Patient"}</td>
+                        <td style={{ padding:8 }}>{p.date}</td>
+                        <td style={{ padding:8 }}>{p.service || "-"}</td>
+                        <td style={{ padding:8 }}>{p.type || "consultation"}</td>
+                        <td style={{ padding:8,textAlign:"right",fontWeight:700 }}>{(Number(p.paid)||0).toLocaleString("fr-FR")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </Card>
+
 
         {/* Donut sexe */}
         <Card>

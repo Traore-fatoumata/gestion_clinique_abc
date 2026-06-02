@@ -46,9 +46,9 @@ export default function DashboardMedecin() {
   // Patients du jour : viennent de la file d'attente partagée (assignés par la secrétaire/chef)
   // mesRdv inclut AUSSI les patients avec rendez-vous qui arrivent à la secrétaire
   const mesRdv = [
-    ...rdv.filter(r => r.docteurId === medecin.id),
+    ...rdv.filter(r => r.docteurId === Number(medecin.id)),
     ...file
-      .filter(f => f.docteurId === medecin.id && f.typeVisite === "rendez_vous" && f.statut !== "termine")
+      .filter(f => f.docteurId === Number(medecin.id) && f.typeVisite === "rendez_vous" && f.statut !== "termine")
       .map(f => ({
         id: f.rdvId || f.id,
         patientId: f.patientId,
@@ -65,13 +65,13 @@ export default function DashboardMedecin() {
   ].sort((a,b) => (a.heure || "").localeCompare(b.heure || ""))
 
   const mesPatients = file
-    .filter(f => f.docteurId === medecin.id && f.statut !== "termine")
+    .filter(f => f.docteurId === Number(medecin.id) && f.statut !== "termine")
     .map(f => {
       const pat = sharedPatients.find(sp => sp.id === f.patientId) || {}
       return { ...pat, ...f, id: f.patientId, fileId: f.id }
     })
 
-  const mesConsultations= consultations.filter(c=>c.docteurId===medecin.id)
+  const mesConsultations= consultations.filter(c=>Number(c.docteurId)===Number(medecin.id))
   const enAttente       = mesPatients.filter(p=>p.statut==="en_attente").length
   const nonSignees      = mesConsultations.filter(c=>!c.signe).length
 
@@ -82,7 +82,7 @@ export default function DashboardMedecin() {
   })
 
   const ouvrirConsultation = (patient) => {
-    const existing = consultations.find(c=>c.patientId===patient.id&&c.date===today()&&c.docteurId===medecin.id)
+    const existing = consultations.find(c=>c.patientId===patient.id&&c.date===today()&&Number(c.docteurId)===Number(medecin.id))
     setMConsult({ patient, consultation:existing||null })
   }
 

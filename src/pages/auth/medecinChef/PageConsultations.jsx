@@ -92,6 +92,18 @@ function ModalConsultationChef({ patient, consultation, medecins, onClose, onVal
             }
           </div>
 
+          <div style={{ background:C.bg, borderRadius:14, padding:"16px 18px", border:"1px solid "+C.border }}>
+            <p style={{ fontSize:11, fontWeight:700, color:C.textPri, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:14 }}>
+              Tarif consultation (modifiable)
+            </p>
+            <input value={consultation? (consultation.montantConsultation ?? "") : ""} onChange={() => { /* valeur gérée localement lors de l'ouverture modal via setMConsult */ }}
+              placeholder="Montant GNF — laissé vide pour tarif par défaut"
+              style={{ width:"100%", padding:"11px 14px", fontSize:14, border:"1.5px solid "+C.border, borderRadius:10, background:C.white, color:C.textPri, outline:"none", fontFamily:"inherit" }} readOnly />
+            <p style={{ fontSize:11, color:C.textMuted, marginTop:8 }}>
+              Le montant peut être ajusté lors de la consultation complète.
+            </p>
+          </div>
+
           <div style={{ background:C.slateSoft, border:"1px solid "+C.slate+"33", borderRadius:10, padding:"12px 16px", display:"flex", gap:8 }}>
             <span style={{ fontSize:16, flexShrink:0 }}>ℹ️</span>
             <p style={{ fontSize:13, color:C.slate, lineHeight:1.5 }}>
@@ -177,7 +189,7 @@ function ModalModifier({ consultation, patient, onClose, onModifier }) {
   )
 }
 
-export default function PageConsultations({ consultations, patients, file, medecins, onValider, onModifier, onContinuerConsultation }) {
+export default function PageConsultations({ consultations, patients, file, medecins, onValider, onModifier, onContinuerConsultation, onReprendreConsultation }) {
   const { user } = useAuth()
   const [mConsult, setMConsult] = useState(null)
   const [mModif,   setMModif]   = useState(null)
@@ -185,10 +197,18 @@ export default function PageConsultations({ consultations, patients, file, medec
   const [filtreService, setFiltreService] = useState("tous")
   const [recherche,     setRecherche]     = useState("")
 
-  const fileAccueil = (file || []).filter(f => f.statut !== "termine" && f.typeVisite !== "rendez_vous")
+  // Montrer uniquement les entrées qui concernent le médecin connecté :
+  // - celles explicitement assignées (`docteurId === currentDoctorId`)
+  // - ou celles sans assignation (null) pour lesquelles le chef prend en charge
+  const currentDoctorId = Number(user?.id)
+  const fileAccueil = (file || []).filter(f => {
+    if (f.statut === "termine" || f.typeVisite === "rendez_vous") return false
+    const assigned = f.docteurId !== undefined && f.docteurId !== null
+    return assigned ? Number(f.docteurId) === currentDoctorId : true
+  })
 
   // Consultations du médecin chef non signées → il peut les continuer
-  const mesConsultations = consultations.filter(c => c.docteurId === user?.id)
+  const mesConsultations = consultations.filter(c => Number(c.docteurId) === currentDoctorId)
   const nonSignees = mesConsultations.filter(c => !c.signe)
 
   const servicesDispo = [...new Set(consultations.map(c=>c.service))].filter(Boolean)
@@ -243,7 +263,7 @@ export default function PageConsultations({ consultations, patients, file, medec
           medecins={medecins}
           onClose={()=>setMConsult(null)}
           onValider={data=>{
-            onValider(mConsult.patientId, {
+            onValider(mConsult.id, {
               ...data,
               patientId: mConsult.patientId,
               fileId:    mConsult.id,
@@ -278,9 +298,10 @@ export default function PageConsultations({ consultations, patients, file, medec
               {fileAccueil.map((c,i)=>{
                 const p = patients.find(pt=>pt.id===c.patientId)
                 if (!p) return null
-                const paye = c.typeVisite==="rendez_vous" || c.paiementConsultation?.statut==="paye"
+                const estGratuit = c.montantConsultation === 0 || c.typeVisite === "rendez_vous"
+                const paye = c.typeVisite==="rendez_vous" || c.paiementConsultation?.statut==="paye" || estGratuit
                 return (
-                  <div key={c.id} style={{ padding:"16px 20px", display:"flex", alignItems:"center", gap:14, borderBottom:i<fileAccueil.length-1?"1px solid "+C.border:"none" }}>
+                  <div key={`${c.id}-${i}`} style={{ padding:"16px 20px", display:"flex", alignItems:"center", gap:14, borderBottom:i<fileAccueil.length-1?"1px solid "+C.border:"none" }}>
                     <Avatar name={p.nom} size={44}/>
                     <div style={{ flex:1 }}>
                       <p style={{ fontSize:14, fontWeight:700, color:C.textPri, marginBottom:3 }}>{p.nom}</p>
@@ -293,7 +314,7 @@ export default function PageConsultations({ consultations, patients, file, medec
                       </div>
                     )}
                     {paye
-                      ? <span style={{ fontSize:11,fontWeight:700,background:"#dcfce7",color:"#15803d",padding:"4px 10px",borderRadius:20,flexShrink:0 }}>Payé</span>
+                      ? <span style={{ fontSize:11,fontWeight:700,background:estGratuit?"#eff6ff":"#dcfce7",color:estGratuit?"#1d4ed8":"#15803d",padding:"4px 10px",borderRadius:20,flexShrink:0 }}>{estGratuit?"Gratuit" : "Payé"}</span>
                       : <span style={{ fontSize:11,fontWeight:700,background:"#fee2e2",color:"#dc2626",padding:"4px 10px",borderRadius:20,flexShrink:0 }}>En attente paiement</span>
                     }
                     <button
@@ -331,7 +352,7 @@ export default function PageConsultations({ consultations, patients, file, medec
                     const p = patients.find(pt=>pt.id===c.patientId)
                     if (!p) return null
                     return (
-                      <tr key={c.id}
+                      <tr key={`${c.id}-${i}`}
                         style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none", background:!c.signe?"#fff8f8":"transparent", transition:"background .15s" }}
                         onMouseEnter={e=>e.currentTarget.style.background=C.slateSoft}
                         onMouseLeave={e=>e.currentTarget.style.background=!c.signe?"#fff8f8":"transparent"}>
@@ -364,7 +385,14 @@ export default function PageConsultations({ consultations, patients, file, medec
                               </button>
                             </>
                           ) : (
-                            <button onClick={()=>{ setMConsult(c) }}
+                            <button onClick={()=>{
+                    if (onReprendreConsultation) {
+                      onReprendreConsultation(c)
+                      return
+                    }
+                    const fileEntry = file.find(f => f.patientId === c.patientId && f.statut !== "termine")
+                    setMConsult({ ...c, fileId: fileEntry?.id })
+                  }}
                               style={{ padding:"6px 12px", border:"none", borderRadius:8, background:C.green, color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:4 }}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                               Continuer
@@ -421,7 +449,7 @@ export default function PageConsultations({ consultations, patients, file, medec
                     const dr = INIT_MEDECINS.find(d=>d.id===c.docteurId)
                     if (!p) return null
                     return (
-                      <tr key={c.id} style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none", transition:"background .15s" }}
+                      <tr key={`${c.id}-${i}`} style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none", transition:"background .15s" }}
                         onMouseEnter={e=>e.currentTarget.style.background=C.slateSoft}
                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                         <td style={{ padding:"12px 12px", fontSize:12, color:C.textMuted, whiteSpace:"nowrap" }}>{fmt(c.date)}</td>

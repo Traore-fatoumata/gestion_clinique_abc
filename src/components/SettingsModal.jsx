@@ -430,10 +430,8 @@ function TabTarification({ s, u }) {
           desc={`Appliqués automatiquement lors des consultations en médecine générale. Modifiables ici par l'administration.`}/>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {[
-            { key:'tarifNourrisson', icon:'👶', label:'Nourrisson', desc:'Moins de 5 ans' },
-            { key:'tarifEnfant',     icon:'🧒', label:'Enfant',     desc:'De 5 à 14 ans' },
-            { key:'tarifAdulte',     icon:'🧑', label:'Adulte',     desc:'De 15 à 60 ans' },
-            { key:'tarifSenior',     icon:'👴', label:'Senior',     desc:'Plus de 60 ans' },
+            { key:'tarifEnfant', icon:'🧒', label:'0 – 15 ans', desc:'Tarif consultation enfants et jeunes' },
+            { key:'tarifAdulte', icon:'🧑', label:'> 15 ans',  desc:'Tarif consultation adultes et seniors' },
           ].map(({ key, icon, label, desc }) => {
             const base = s[key] || 0
             const ttc  = Math.round(base * tva)

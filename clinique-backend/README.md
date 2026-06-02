@@ -1,4 +1,4 @@
-# 🏥 Clinique ABC Marouane — Guide d'intégration Backend
+# 🏥 Clinique SantéPro — Guide d'intégration Backend
 
 ## Structure du projet
 
@@ -33,11 +33,11 @@ clinique-backend/
 psql -U postgres
 
 # Créer la base
-CREATE DATABASE clinique_marouane;
+CREATE DATABASE clinique_santepro;
 \q
 
 # Appliquer le schéma
-psql -U postgres -d clinique_marouane -f sql/01_schema.sql
+psql -U postgres -d clinique_santepro -f sql/01_schema.sql
 ```
 
 ---

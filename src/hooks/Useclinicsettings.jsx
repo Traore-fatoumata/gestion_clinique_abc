@@ -10,13 +10,13 @@ const ClinicSettingsContext = createContext()
 export const DEFAULT_SETTINGS = {
 
   // ── 1. IDENTITÉ ──────────────────────────────────────────────
-  nomClinique:       'Clinique Médicale ABC Marouane',
-  nomCourt:          'Marouane',
+  nomClinique:       'Clinique SantéPro',
+  nomCourt:          'SantéPro',
   slogan:            'Des soins de qualité, une gestion simplifiée.',
   adresse:           'Quartier Almamya, Commune de Kaloum, Conakry',
   telephone:         '+224 624 00 00 00',
   telephone2:        '',
-  email:             'clinique.abc.marouane@gmail.com',
+  email:             'contact@santepro.clinic',
   siteWeb:           '',
   pays:              'République de Guinée',
   ville:             'Conakry',
@@ -38,16 +38,16 @@ export const DEFAULT_SETTINGS = {
   },
 
   // ── 3. TARIFS ─────────────────────────────────────────────────
-  tarifConsultation:     50000,
+  tarifConsultation:     20000,
   tarifRendezVous:       75000,
   tarifLaboratoire:      30000,
   tarifUrgence:          100000,
   tarifHospitalisation:  200000,
   // Tarifs consultation par tranche d'âge
-  tarifNourrisson:       30000,   // < 5 ans
-  tarifEnfant:           35000,   // 5–14 ans
-  tarifAdulte:           50000,   // 15–60 ans
-  tarifSenior:           40000,   // > 60 ans
+  tarifNourrisson:       15000,   // 0–15 ans
+  tarifEnfant:           15000,   // 0–15 ans
+  tarifAdulte:           20000,   // > 15 ans
+  tarifSenior:           20000,   // > 15 ans
   tvaActif:              false,
   tvaTaux:               18,
   remiseMaxPct:          20,   // remise max autorisée sans validation chef
@@ -131,7 +131,16 @@ export function ClinicSettingsProvider({ children }) {
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem('clinique_settings_v3')
-      if (saved) return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        const migrated = { ...parsed }
+        if (Number(migrated.tarifConsultation) === 50000) migrated.tarifConsultation = 20000
+        if (Number(migrated.tarifNourrisson) === 30000) migrated.tarifNourrisson = 15000
+        if (Number(migrated.tarifEnfant) === 35000) migrated.tarifEnfant = 15000
+        if (Number(migrated.tarifAdulte) === 50000) migrated.tarifAdulte = 20000
+        if (Number(migrated.tarifSenior) === 40000) migrated.tarifSenior = 20000
+        return { ...DEFAULT_SETTINGS, ...migrated }
+      }
     } catch { /* ignore */ }
     return DEFAULT_SETTINGS
   })
@@ -140,12 +149,11 @@ export function ClinicSettingsProvider({ children }) {
   const initialized = useRef(false)
 
   // Charger les paramètres depuis l'API au démarrage
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (apiLoaded) return
     const chargerParametres = async () => {
       try {
-        const response = await parametresService.recupererTous()
+        const response = await parametresService.listerParametres()
         if (response.success && response.parametres) {
           const params = response.parametres
           // Mapper les paramètres API vers les settings locaux
