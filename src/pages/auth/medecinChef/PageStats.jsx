@@ -516,43 +516,6 @@ export default function PageStats({ consultations, patients, file = [] }) {
       {/* Répartition patients (donut) + Pathologies (barres SVG) */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:16, marginBottom:4 }}>
 
-        {/* Paiements détaillés (consultations + examens) */}
-        <Card>
-          <div style={{ padding:"18px 20px" }}>
-            <p style={{ fontSize:14,fontWeight:700,color:C.textPri,marginBottom:8 }}>Recettes détaillées</p>
-            <p style={{ fontSize:12,color:C.textMuted,marginBottom:12 }}>Liste des paiements enregistrés pour la période / date sélectionnée</p>
-            {payees.length===0 ? (
-              <p style={{ color:C.textMuted,textAlign:"center",padding:"24px 0" }}>Aucun paiement</p>
-            ) : (
-              <div style={{ maxHeight:260, overflowY:"auto" }}>
-                <table style={{ width:"100%",borderCollapse:"collapse" }}>
-                  <thead>
-                    <tr>
-                      <th>Patient</th>
-                      <th>Date</th>
-                      <th>Service</th>
-                      <th>Type</th>
-                      <th style={{ textAlign:"right" }}>Payé (GNF)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payees.map((p,i)=>(
-                      <tr key={`pay-${i}`}>
-                        <td style={{ padding:8 }}>{p.patientName || "Patient"}</td>
-                        <td style={{ padding:8 }}>{p.date}</td>
-                        <td style={{ padding:8 }}>{p.service || "-"}</td>
-                        <td style={{ padding:8 }}>{p.type || "consultation"}</td>
-                        <td style={{ padding:8,textAlign:"right",fontWeight:700 }}>{(Number(p.paid)||0).toLocaleString("fr-FR")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </Card>
-
-
         {/* Donut sexe */}
         <Card>
           <div style={{ padding:"18px 20px" }}>

@@ -2,21 +2,7 @@ import { useState } from "react"
 import { C, Card, CardHeader, Avatar } from "./shared.jsx"
 
 export default function PagePresence({ medecins }) {
-  const [presences] = useState([
-    { id:1,  docteurId:1,  arrivee:"07:30", depart:null,    statut:"present",   patientsVus:4 },
-    { id:2,  docteurId:2,  arrivee:"08:00", depart:null,    statut:"present",   patientsVus:3 },
-    { id:3,  docteurId:3,  arrivee:"08:15", depart:null,    statut:"present",   patientsVus:2 },
-    { id:4,  docteurId:4,  arrivee:null,    depart:null,    statut:"absent",    patientsVus:0 },
-    { id:5,  docteurId:5,  arrivee:null,    depart:null,    statut:"en_retard", patientsVus:0 },
-    { id:6,  docteurId:6,  arrivee:"07:55", depart:null,    statut:"present",   patientsVus:5 },
-    { id:7,  docteurId:7,  arrivee:"08:30", depart:null,    statut:"present",   patientsVus:1 },
-    { id:8,  docteurId:8,  arrivee:null,    depart:null,    statut:"absent",    patientsVus:0 },
-    { id:9,  docteurId:9,  arrivee:"08:05", depart:null,    statut:"present",   patientsVus:2 },
-    { id:10, docteurId:10, arrivee:"08:45", depart:null,    statut:"present",   patientsVus:1 },
-    { id:11, docteurId:11, arrivee:null,    depart:null,    statut:"en_retard", patientsVus:0 },
-    { id:12, docteurId:12, arrivee:"07:45", depart:null,    statut:"present",   patientsVus:0 },
-    { id:13, docteurId:13, arrivee:"08:10", depart:null,    statut:"present",   patientsVus:0 },
-  ])
+  const [presences] = useState([])  // Données de présence vides - à charger depuis l'API si nécessaire
   const cfgS = { present:{label:"Présent",color:C.green,bg:C.greenSoft}, absent:{label:"Absent",color:C.red,bg:C.redSoft}, en_retard:{label:"En retard",color:C.slate,bg:C.slateSoft}, parti:{label:"Parti",color:C.slate,bg:C.slateSoft} }
   return (
     <div style={{ maxWidth:960, margin:"0 auto" }}>

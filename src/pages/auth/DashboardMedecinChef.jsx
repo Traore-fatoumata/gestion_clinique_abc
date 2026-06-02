@@ -5,7 +5,7 @@ import { useClinicSettings } from "../../hooks/useClinicSettings.jsx"
 import { useAuth } from "../../hooks/useAuth.jsx"
 import { useNavigate } from "react-router-dom"
 import { useSharedData } from "../../hooks/useSharedData.jsx"
-import { today, C, INIT_PATIENTS, INIT_COMPTES, INIT_MEDECINS } from "./medecinChef/shared.jsx"
+import { today, C, INIT_PATIENTS, INIT_COMPTES, INIT_MEDECINS, FInput, Inp, Btn, Overlay } from "./medecinChef/shared.jsx"
 import PageAccueil       from "./medecinChef/PageAccueil.jsx"
 import PageConsultations from "./medecinChef/PageConsultations.jsx"
 import PageStats         from "./medecinChef/PageStats.jsx"
@@ -28,13 +28,34 @@ export default function DashboardMedecinChef() {
   const [page,         setPage]         = useState("accueil")
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
   const consultations = sharedConsultations
-  const patients      = sharedPatients.length > 0 ? sharedPatients : INIT_PATIENTS
+  const patients      = sharedPatients
   const [comptes,      setComptes]      = useState(INIT_COMPTES)
   const [medecins,     setMedecins]     = useState(INIT_MEDECINS)
   const [heure,        setHeure]        = useState("")
   const [showPointer,  setShowPointer]  = useState(false)
   const [pointerHeure, setPointerHeure] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showMonProfil, setShowMonProfil] = useState(false)
+
+  // ── État pour le modal Mon Profil ──
+  const [profilForm, setProfilForm] = useState({
+    nom: user?.nom || "",
+    email: user?.email || "",
+    telephone: user?.telephone || "",
+    ancienMotDePasse: "",
+    nouveauMotDePasse: "",
+    confirmerMotDePasse: "",
+  })
+
+  const pf = (k, v) => setProfilForm(p => ({ ...p, [k]: v }))
+  const profilOk = profilForm.nom && profilForm.email
+  const motDePasseOk = !profilForm.nouveauMotDePasse || (profilForm.ancienMotDePasse && profilForm.nouveauMotDePasse.length >= 6 && profilForm.nouveauMotDePasse === profilForm.confirmerMotDePasse)
+
+  const handleSaveProfil = () => {
+    if (!profilOk || !motDePasseOk) return
+    alert(profilForm.nouveauMotDePasse ? "Profil et mot de passe mis à jour !" : "Profil mis à jour !")
+    setShowMonProfil(false)
+  }
 
   // ── Modal consultation complète (2ème étape quand chef garde le patient) ──
   const [mConsultComplete, setMConsultComplete] = useState(null)
@@ -53,13 +74,13 @@ export default function DashboardMedecinChef() {
     specialite: user?.specialite || "Médecine générale",
   }
 
-  // ── Étape 1 : première consultation d'accueil ────────
-  // Appelé depuis PageConsultations après le modal d'accueil
   const handleValider = (consultId, data) => {
+    console.log("handleValider appelé avec:", { consultId, data })
     const ts = new Date().toLocaleString("fr-FR")
     const existing = consultations.find(c => c.id === consultId)
     const assignedDoctorId = data.docteurId ? Number(data.docteurId) : medecinChef.id
     const isAssignedToOtherDoctor = data.docteurId && Number(data.docteurId) !== medecinChef.id
+    console.log("isAssignedToOtherDoctor:", isAssignedToOtherDoctor, "medecinChef.id:", medecinChef.id, "data.docteurId:", data.docteurId)
     const consultationPayload = {
       id: consultId,
       ...data,
@@ -74,15 +95,19 @@ export default function DashboardMedecinChef() {
       addConsultation(consultationPayload)
     }
 
-    // Utiliser le fileId fourni directement plutôt que de rechercher dans file
     const fileId = data.fileId
     const entree = fileId ? file.find(f => f.id === fileId) : null
+    console.log("entree trouvée:", entree)
 
-    if (isAssignedToOtherDoctor) {
-      // ── Cas 1 : orienté vers un médecin de service ──
-      // Marquer comme terminé et notifier le médecin
+    if (isAssignedToOtherDoctor && entree) {
+      // Mettre à jour l'entrée dans la file pour la marquer comme terminée et assignée
       if (entree) {
-        updateFileEntry(entree.id, { statut: "termine", medecin_id: data.docteurId })
+        updateFileEntry(entree.id, {
+          statut: "termine",
+          medecin_id: Number(data.docteurId),
+          docteurId: Number(data.docteurId),
+          paiementConsultation: { statut: "paye", montant: entree.montantConsultation || 0 }
+        })
       }
       const patient = sharedPatients.find(p => p.id === data.patientId)
       addNotif({
@@ -91,15 +116,13 @@ export default function DashboardMedecinChef() {
         motif:      data.plaintes || entree?.motif || "Consultation",
         service:    data.service || "",
       })
-    } else {
-      // ── Cas 2 : chef garde le patient → ouvre consultation complète ──
+    } else if (!isAssignedToOtherDoctor) {
       const patient = sharedPatients.find(p => p.id === data.patientId) ||
                       patients.find(p => p.id === data.patientId)
       const entreeFile = file.find(f => f.patientId === data.patientId && f.statut !== "termine")
       setMConsultComplete({
         patient,
         fileId: entreeFile?.id,
-        // pré-remplir avec les données de la première consultation
         consultationExistante: {
           patientId: data.patientId,
           motif:     data.plaintes,
@@ -107,10 +130,11 @@ export default function DashboardMedecinChef() {
           service:   medecinChef.specialite,
         }
       })
+    } else {
+      alert("Erreur : impossible de trouver l'entrée dans la file d'attente.")
     }
   }
 
-  // ── Étape 2 : sauvegarder la consultation complète ──
   const handleSauvegarderComplete = (data) => {
     if (!mConsultComplete) return
     const { patient, fileId } = mConsultComplete
@@ -136,13 +160,9 @@ export default function DashboardMedecinChef() {
     }
     setMConsultComplete(null)
     alert("Consultation sauvegardée.")
-    // Mode test demandé : vider toutes les données patients/local pour voir l'écran vierge
-    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch {
-      // ignore
-    }
+    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch { /* ignore */ }
   }
 
-  // ── Étape 2 : signer la consultation complète ────────
   const handleSignerComplete = (data) => {
     if (!mConsultComplete) return
     const { patient, fileId } = mConsultComplete
@@ -165,7 +185,6 @@ export default function DashboardMedecinChef() {
       signePar:         medecinChef.nom,
     })
 
-    // Terminer l'entrée dans la file
     if (fileId) {
       updateFileEntry(fileId, {
         statut: "termine",
@@ -182,10 +201,7 @@ export default function DashboardMedecinChef() {
       ? `Consultation signée. Frais d'examens : ${data.fraisExamens.toLocaleString("fr-FR")} GNF — orienter le patient vers la comptabilité.`
       : "Consultation signée et validée."
     alert(msg)
-    // Mode test : vider données frontend
-    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch {
-      // ignore
-    }
+    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch { /* ignore */ }
   }
 
   const handleReprendreConsultation = (consultation) => {
@@ -264,7 +280,6 @@ export default function DashboardMedecinChef() {
     updateConsultation(consultId, data)
   }
 
-  // ── Fonction pour imprimer ordonnance ──
   const imprimerOrdonnance = (consultation) => {
     const patient = patients.find(p => p.id === consultation.patientId)
     if (!patient) return
@@ -354,7 +369,6 @@ export default function DashboardMedecinChef() {
   return (
     <div style={{ minHeight: "100vh", background: "#ffffff", fontFamily: "'Segoe UI',system-ui,sans-serif", color: C.textPri }}>
 
-      {/* ── Modal consultation complète (2ème étape) ── */}
       {mConsultComplete && (
         <ModalConsultation
           key={mConsultComplete.patient?.id + "-chef-complet"}
@@ -378,7 +392,40 @@ export default function DashboardMedecinChef() {
         />
       )}
 
-      {/* SIDEBAR */}
+      {/* Modal Mon Profil */}
+      {showMonProfil && (
+        <Overlay onClose={() => setShowMonProfil(false)}>
+          <div style={{ background: C.white, borderRadius: 20, width: "100%", maxWidth: 560, maxHeight: "90vh", overflow: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ padding: "22px 28px 18px", borderBottom: "1px solid " + C.border, display: "flex", justifyContent: "space-between" }}>
+              <div><p style={{ fontSize: 18, fontWeight: 800, color: C.textPri }}>Mon Profil</p><p style={{ fontSize: 13, color: C.textSec, marginTop: 3 }}>Médecin chef — Modifier vos informations</p></div>
+              <button onClick={() => setShowMonProfil(false)} style={{ background: C.slateSoft, border: "none", borderRadius: 8, color: C.textSec, cursor: "pointer", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <FInput label="Nom complet" req><Inp value={profilForm.nom} onChange={e => pf("nom", e.target.value)} placeholder="Ex : Dr. Doumbouya" /></FInput>
+              <FInput label="Email" req><Inp type="email" value={profilForm.email} onChange={e => pf("email", e.target.value)} placeholder="email@cab.gn" /></FInput>
+              <FInput label="Téléphone"><Inp value={profilForm.telephone} onChange={e => pf("telephone", e.target.value)} placeholder="+224 6XX XX XX XX" /></FInput>
+              
+              <div style={{ marginTop: 8 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri, marginBottom: 12 }}>Changer le mot de passe</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <FInput label="Ancien mot de passe"><Inp type="password" value={profilForm.ancienMotDePasse} onChange={e => pf("ancienMotDePasse", e.target.value)} placeholder="••••••••" /></FInput>
+                  <FInput label="Nouveau mot de passe"><Inp type="password" value={profilForm.nouveauMotDePasse} onChange={e => pf("nouveauMotDePasse", e.target.value)} placeholder="Min. 6 caractères" /></FInput>
+                  <FInput label="Confirmer le mot de passe"><Inp type="password" value={profilForm.confirmerMotDePasse} onChange={e => pf("confirmerMotDePasse", e.target.value)} placeholder="••••••••" /></FInput>
+                  {profilForm.nouveauMotDePasse && profilForm.nouveauMotDePasse !== profilForm.confirmerMotDePasse && (
+                    <p style={{ fontSize: 11, color: C.red }}>Les mots de passe ne correspondent pas</p>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8, borderTop: "1px solid " + C.border }}>
+                <Btn onClick={() => setShowMonProfil(false)} variant="secondary">Annuler</Btn>
+                <Btn onClick={handleSaveProfil} disabled={!profilOk || !motDePasseOk}>Enregistrer</Btn>
+              </div>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
       {sidebarOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 100 }} onClick={() => setSidebarOpen(false)}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 260, background: C.white, boxShadow: "4px 0 20px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", overflow: "auto" }} onClick={e => e.stopPropagation()}>
@@ -418,7 +465,6 @@ export default function DashboardMedecinChef() {
         </div>
       )}
 
-      {/* HEADER */}
       <header style={{ background: C.white, borderBottom: "1px solid " + C.border, padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
         <button onClick={() => setSidebarOpen(true)} style={{ width: 40, height: 40, borderRadius: 8, border: "1px solid " + C.border, background: C.white, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5 }}>
           <div style={{ width: 20, height: 2, background: C.textPri, borderRadius: 2 }} />
@@ -452,7 +498,9 @@ export default function DashboardMedecinChef() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.2" strokeLinecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
             Pointer Arrivée
           </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div onClick={() => setShowMonProfil(true)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "4px 8px", borderRadius: 8 }}
+            onMouseEnter={e => e.currentTarget.style.background = C.slateSoft}
+            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
             <div style={{ textAlign: "right" }}>
               <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri }}>{user?.nom || "Dr. Doumbouya"}</p>
               <p style={{ fontSize: 12, color: C.textSec }}>Médecin chef</p>
@@ -470,7 +518,6 @@ export default function DashboardMedecinChef() {
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
-      {/* Confirmation pointer */}
       {showPointer && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: C.white, borderRadius: 16, padding: 32, maxWidth: 380, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
@@ -486,13 +533,12 @@ export default function DashboardMedecinChef() {
         </div>
       )}
 
-      {/* CONTENU */}
       <main style={{ padding: "32px 24px" }}>
         {page === "accueil"       && <PageAccueil       consultations={consultations} patients={patients} file={file} setPage={setPage} />}
         {page === "consultations" && <PageConsultations consultations={consultations} patients={patients} file={file} medecins={medecins} onValider={handleValider} onModifier={handleModifier} onContinuerConsultation={imprimerOrdonnance} onReprendreConsultation={handleReprendreConsultation} />}
-        {page === "comptes"       && <PageComptes       comptes={comptes} setComptes={setComptes} medecins={medecins} setMedecins={setMedecins} />}
+        {page === "comptes"       && <PageComptes       comptes={comptes} setComptes={setComptes} medecins={medecins} setMedecins={setMedecins} user={user} />}
         {page === "presence"      && <PagePresence      medecins={medecins} />}
-        {page === "stats"         && <PageStats         consultations={consultations} patients={patients} file={file} /> }
+        {page === "stats"         && <PageStats         consultations={consultations} patients={patients} file={file} />}
         {page === "historique"    && <PageHistorique    consultations={consultations} patients={patients} resultatsLabo={resultatsLabo} soins={soins} rdv={rdv} />}
       </main>
 

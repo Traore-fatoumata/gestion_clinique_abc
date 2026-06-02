@@ -18,13 +18,41 @@ export default function PageAccueil({ consultations, patients, file, setPage }) 
   const recettesAujFile = normalizedFile.reduce((s,f)=>{
     if (f.dateEntree !== todayStr) return s
     const key = `${Number(f.patientId)}|${f.dateEntree}`
-    const paiementConsult = Number(f.paiementConsultation?.montant ?? 0)
-    const paiementExamens = Number(f.paiementExamens?.montantPaye ?? 0)
+    // Le montant de la consultation est dans montantConsultation (à la racine)
+    // ou dans paiementConsultation.montant si le statut est "paye"
+    const montantConsult = Number(f.montantConsultation || 0)
+    // Si paiementConsultation existe et est payé, on utilise son montant, sinon montantConsultation
+    const paiementConsult = f.paiementConsultation?.statut === "paye"
+      ? Number(f.paiementConsultation?.montant || montantConsult)
+      : 0
+    const paiementExamens = Number(f.paiementExamens?.montantPaye || 0)
+    // On n'ajoute le paiement consultation que si ce n'est pas déjà compté dans les consultations
     return s + (payeesConsultAuj.has(key) ? 0 : paiementConsult) + paiementExamens
   }, 0)
   const recettesAuj  = recettesAujConsult + recettesAujFile
-  const recettesTot  = consultations.filter(c=>c.statut==="paye").reduce((s,c)=>s + Number(c.montant || 0), 0)
-  const recettesMois = consultations.filter(c=>{ const d=new Date(c.date),n=new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()&&c.statut==="paye" }).reduce((s,c)=>s + Number(c.montant || 0), 0)
+
+  // Calcul des recettes totales : consultations payées + paiements file
+  const paidConsultKeys = new Set(consultations.filter(c=>c.statut==="paye").map(c => `${Number(c.patientId)}|${c.date}`))
+  const recettesTotConsult = consultations.filter(c=>c.statut==="paye").reduce((s,c)=>s + Number(c.montant || 0), 0)
+  const recettesTotFile = normalizedFile
+    .filter(f => f.paiementConsultation?.statut === "paye" && !paidConsultKeys.has(`${Number(f.patientId)}|${f.dateEntree}`))
+    .reduce((s,f)=>s + Number(f.paiementConsultation?.montant || f.montantConsultation || 0), 0)
+  const recettesTotFileExamens = normalizedFile
+    .filter(f => Number(f.paiementExamens?.montantPaye || 0) > 0)
+    .reduce((s,f)=>s + Number(f.paiementExamens?.montantPaye || 0), 0)
+  const recettesTot = recettesTotConsult + recettesTotFile + recettesTotFileExamens
+
+  // Calcul des recettes du mois
+  const now = new Date()
+  const thisMonth = (d) => { const dp = new Date(d); return dp.getMonth() === now.getMonth() && dp.getFullYear() === now.getFullYear() }
+  const recettesMoisConsult = consultations.filter(c=>thisMonth(c.date) && c.statut==="paye").reduce((s,c)=>s + Number(c.montant || 0), 0)
+  const recettesMoisFile = normalizedFile
+    .filter(f => thisMonth(f.dateEntree) && f.paiementConsultation?.statut === "paye" && !paidConsultKeys.has(`${Number(f.patientId)}|${f.dateEntree}`))
+    .reduce((s,f)=>s + Number(f.paiementConsultation?.montant || f.montantConsultation || 0), 0)
+  const recettesMoisFileExamens = normalizedFile
+    .filter(f => thisMonth(f.dateEntree) && Number(f.paiementExamens?.montantPaye || 0) > 0)
+    .reduce((s,f)=>s + Number(f.paiementExamens?.montantPaye || 0), 0)
+  const recettesMois = recettesMoisConsult + recettesMoisFile + recettesMoisFileExamens
   const recentes     = [...consultations].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5)
 
   return (
