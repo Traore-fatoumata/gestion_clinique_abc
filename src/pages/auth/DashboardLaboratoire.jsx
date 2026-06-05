@@ -3,10 +3,11 @@ import logo from "../../assets/images/logo.jpeg"
 import { useAuth } from "../../hooks/useAuth.jsx"
 import { useSharedData } from "../../hooks/useSharedData.jsx"
 import { useNavigate } from "react-router-dom"
-import { C, Avatar, Badge, Btn, today, getNowTime, DEMANDES_INIT } from "./laboratoire/shared.jsx"
-import ModalNouvelleDemande  from "./laboratoire/ModalNouvelleDemande.jsx"
+import { C, Avatar, Badge, Btn, today, getNowTime } from "./laboratoire/shared.jsx"
+import { mapDemandeApi } from "./laboratoire/mapDemande.js"
 import ModalSaisieResultats  from "./laboratoire/ModalSaisieResultats.jsx"
 import ModalFicheLaboratoire from "./laboratoire/ModalFicheLaboratoire.jsx"
+import ModalTarifsLabo from "./laboratoire/ModalTarifsLabo.jsx"
 import laboService from "../../services/laboService"
 
 export default function DashboardLaboratoire() {
@@ -14,51 +15,36 @@ export default function DashboardLaboratoire() {
   const navigate   = useNavigate()
   const handleLogout = () => { logout(); navigate("/login") }
 
-  const { patients: sharedPatients, resultatsLabo, addResultatLabo, updateResultatLabo } = useSharedData()
+  const { notifs, rafraichir } = useSharedData()
 
   const [sidebarOpen,         setSidebarOpen]         = useState(false)
-  const [demandes,            setDemandes]            = useState(DEMANDES_INIT)
-  const [showNouvelleDemande, setShowNouvelleDemande] = useState(false)
+  const [demandes,            setDemandes]            = useState([])
+  const [chargement,          setChargement]          = useState(true)
   const [showSaisie,          setShowSaisie]          = useState(null)
   const [showFiche,           setShowFiche]           = useState(null)
+  const [showTarifs,          setShowTarifs]          = useState(null)
+  const mesNotifs = (notifs || []).filter(n => !n.lu).slice(0, 5)
   const [recherche,           setRecherche]           = useState("")
   const [heure,               setHeure]               = useState(getNowTime())
   const [dateStr,             setDateStr]             = useState("")
 
-  // Charger les demandes depuis l'API
-  useEffect(() => {
-    const chargerDemandes = async () => {
-      try {
-        const response = await laboService.listerDemandes()
-        if (response.success && response.demandes) {
-          const demandesFormattees = response.demandes.map(d => ({
-            id: d.id,
-            patientId: d.patientId,
-            patient: d.patient,
-            dateDemande: d.dateDemande,
-            heureDemande: d.heureDemande,
-            medecinPrescripteur: d.medecinPrescripteur,
-            service: d.service,
-            examens: d.examens,
-            statut: d.statut,
-            datePrelevement: d.datePrelevement,
-            heurePrelevement: d.heurePrelevement,
-            dateRendu: d.dateRendu,
-            heureRendu: d.heureRendu,
-            resultats: {},
-            valide: d.valide,
-            validePar: d.validePar,
-            valideLe: d.valideLe,
-            urgent: d.urgent,
-            commentaireGlobal: d.commentaireGlobal
-          }))
-          setDemandes(demandesFormattees)
-        }
-      } catch (err) {
-        console.error("Erreur chargement demandes labo:", err)
+  const chargerDemandes = async () => {
+    try {
+      const response = await laboService.listerDemandes()
+      if (response.success && response.demandes) {
+        setDemandes(response.demandes.map(mapDemandeApi))
       }
+    } catch (err) {
+      console.error("Erreur chargement demandes labo:", err)
+    } finally {
+      setChargement(false)
     }
+  }
+
+  useEffect(() => {
     chargerDemandes()
+    const t = setInterval(chargerDemandes, 30_000)
+    return () => clearInterval(t)
   }, [])
 
   useEffect(() => {
@@ -88,12 +74,13 @@ export default function DashboardLaboratoire() {
     else if (onglet==="termines") liste = demandes.filter(d=>d.statut==="termine")
     if (recherche.trim()) {
       const q = recherche.toLowerCase()
-      liste = liste.filter(d =>
-        d.patient.nom.toLowerCase().includes(q) ||
-        d.patient.pid.toLowerCase().includes(q) ||
-        d.medecinPrescripteur.toLowerCase().includes(q) ||
-        d.examens.some(e=>e.nom.toLowerCase().includes(q))
-      )
+      liste = liste.filter(d => {
+        const nom = (d.patient?.nom || "").toLowerCase()
+        const pid = (d.patient?.pid || "").toLowerCase()
+        const med = String(d.medecinPrescripteur || "").toLowerCase()
+        return nom.includes(q) || pid.includes(q) || med.includes(q)
+          || d.examens.some(e => e.nom.toLowerCase().includes(q))
+      })
     }
     return [...liste].sort((a,b) => {
       if (a.urgent&&!b.urgent) return -1
@@ -123,38 +110,47 @@ export default function DashboardLaboratoire() {
     en_cours:"Analyses en cours", termines:"Résultats validés",
   }
 
-  const handleCreerDemande = (form) => {
-    const patient = sharedPatients.find(p=>p.id===parseInt(form.patientId))
-    const nouvelle = {
-      id:Date.now(), patientId:patient.id, patient,
-      dateDemande:today(), heureDemande:getNowTime(),
-      medecinPrescripteur:form.medecinPrescripteur, service:form.service,
-      examens:form.examens.map(e=>({...e, prix:parseInt(e.prix)||0})),
-      statut:"en_attente",
-      datePrelevement:null, heurePrelevement:null,
-      dateRendu:null, heureRendu:null,
-      resultats:{}, valide:false, validePar:null, valideLe:null,
-      urgent:form.urgent, commentaireGlobal:""
+  const handleDemarrerPrelevement = async (id) => {
+    try {
+      await laboService.demarrerPrelevement(id)
+      await chargerDemandes()
+    } catch (e) {
+      alert(e.message || "Erreur lors du prélèvement.")
     }
-    setDemandes(prev => [nouvelle, ...prev])
-    addResultatLabo({ ...nouvelle, type:"demande_labo" })
   }
-  const handleDemarrerPrelevement = (id) => {
-    setDemandes(prev => prev.map(d => d.id===id?{...d, statut:"en_cours", datePrelevement:today(), heurePrelevement:getNowTime()}:d))
-    const rl = resultatsLabo.find(r=>r.id===id)
-    if (rl) updateResultatLabo(id, { statut:"en_cours", datePrelevement:today(), heurePrelevement:getNowTime() })
+
+  const handleSauvegarder = async (id, resultats, commentaireGlobal) => {
+    try {
+      await laboService.sauvegarderResultats(id, resultats, commentaireGlobal)
+      await chargerDemandes()
+      setShowSaisie(null)
+    } catch (e) {
+      alert(e.message || "Erreur de sauvegarde.")
+    }
   }
-  const handleSauvegarder = (id, resultats, commentaireGlobal) => {
-    setDemandes(prev => prev.map(d => d.id===id?{...d, resultats, commentaireGlobal, statut:"en_cours"}:d))
-    setShowSaisie(null)
+
+  const handleFixerTarifs = async (id, examens) => {
+    try {
+      await laboService.fixerTarifs(id, examens)
+      await chargerDemandes()
+      setShowTarifs(null)
+      rafraichir?.()
+      alert("Tarifs enregistrés. Le patient peut payer à la comptabilité.")
+    } catch (e) {
+      alert(e.message || "Erreur lors de l'enregistrement des tarifs.")
+    }
   }
-  const handleValider = (id, resultats, commentaireGlobal) => {
-    const valideLe = today()+" "+getNowTime()
-    const biologiste = user?.nom || "Biologiste"
-    setDemandes(prev => prev.map(d => d.id===id?{...d, resultats, commentaireGlobal, statut:"termine", dateRendu:today(), heureRendu:getNowTime(), valide:true, validePar:biologiste, valideLe}:d))
-    const rl = resultatsLabo.find(r=>r.id===id)
-    if (rl) updateResultatLabo(id, { resultats, commentaireGlobal, statut:"termine", dateRendu:today(), valide:true, validePar:biologiste, valideLe })
-    setShowSaisie(null)
+
+  const handleValider = async (id, resultats, commentaireGlobal) => {
+    try {
+      await laboService.validerDemande(id, user?.nom || "Biologiste", resultats, commentaireGlobal)
+      await chargerDemandes()
+      rafraichir?.()
+      setShowSaisie(null)
+      alert("Résultats validés — le médecin peut signer la consultation.")
+    } catch (e) {
+      alert(e.message || "Erreur de validation.")
+    }
   }
 
 
@@ -162,9 +158,15 @@ export default function DashboardLaboratoire() {
     <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI', system-ui, sans-serif", color:C.textPri }}>
 
       {/* MODALS */}
-      {showNouvelleDemande && <ModalNouvelleDemande patients={sharedPatients} onClose={()=>setShowNouvelleDemande(false)} onCreate={handleCreerDemande}/>}
       {showSaisie && <ModalSaisieResultats demande={showSaisie} onClose={()=>setShowSaisie(null)} onSave={(r,c)=>handleSauvegarder(showSaisie.id,r,c)} onValider={(r,c)=>handleValider(showSaisie.id,r,c)}/>}
       {showFiche  && <ModalFicheLaboratoire demande={showFiche} onClose={()=>setShowFiche(null)}/>}
+      {showTarifs && (
+        <ModalTarifsLabo
+          demande={showTarifs}
+          onClose={() => setShowTarifs(null)}
+          onSave={examens => handleFixerTarifs(showTarifs.id, examens)}
+        />
+      )}
 
       {/* SIDEBAR OVERLAY */}
       {sidebarOpen && (
@@ -195,10 +197,10 @@ export default function DashboardLaboratoire() {
             </nav>
             <div style={{ padding:"14px 16px 20px", borderTop:"1px solid "+C.border }}>
               <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:C.purpleSoft, borderRadius:12, border:"1px solid "+C.purple+"33" }}>
-                <Avatar name="M. Baldé" size={36}/>
+                <Avatar name={user?.nom || "Labo"} size={36}/>
                 <div>
-                  <p style={{ fontSize:13, fontWeight:700, color:C.textPri }}>M. Baldé</p>
-                  <p style={{ fontSize:11, color:C.purple, fontWeight:600 }}>Technicien labo</p>
+                  <p style={{ fontSize:13, fontWeight:700, color:C.textPri }}>{user?.nom || "Laboratoire"}</p>
+                  <p style={{ fontSize:11, color:C.purple, fontWeight:600 }}>{user?.titre || "Technicien labo"}</p>
                 </div>
               </div>
             </div>
@@ -230,6 +232,14 @@ export default function DashboardLaboratoire() {
           <p style={{ fontSize:12, color:C.textMuted, textTransform:"capitalize" }}>{dateStr}</p>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          {mesNotifs.length > 0 && (
+            <div style={{ background: C.purpleSoft, border: "1px solid " + C.purple + "33", borderRadius: 10, padding: "6px 12px", maxWidth: 280 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: C.purple }}>{mesNotifs.length} nouvelle(s) demande(s)</p>
+              <p style={{ fontSize: 10, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {mesNotifs[0]?.patient_nom || mesNotifs[0]?.patientNom}
+              </p>
+            </div>
+          )}
           {stats.en_attente>0&&(
             <div style={{ display:"flex", alignItems:"center", gap:6, background:C.slateSoft, border:"1px solid "+C.slate+"40", borderRadius:10, padding:"6px 12px" }}>
               <span style={{ fontSize:12, fontWeight:700, color:C.slate }}>{stats.en_attente} en attente</span>
@@ -277,7 +287,8 @@ export default function DashboardLaboratoire() {
           <div>
             <p style={{ fontSize:20, fontWeight:800, color:C.textPri, letterSpacing:"-0.02em" }}>{titres[onglet]}</p>
             <p style={{ fontSize:13, color:C.textMuted, marginTop:2 }}>
-              {demandesFiltrees.length} résultat{demandesFiltrees.length>1?"s":""}{recherche&&` pour "${recherche}"`}
+              Demandes envoyées par les médecins · {demandesFiltrees.length} affichée{demandesFiltrees.length>1?"s":""}
+              {recherche && ` pour « ${recherche} »`}
             </p>
           </div>
           <div style={{ display:"flex", gap:10, alignItems:"center" }}>
@@ -286,7 +297,7 @@ export default function DashboardLaboratoire() {
               <input placeholder="Patient, médecin, examen…" value={recherche} onChange={e=>setRecherche(e.target.value)}
                 style={{ padding:"9px 12px 9px 34px", fontSize:13, border:"1.5px solid "+C.border, borderRadius:10, background:C.white, color:C.textPri, outline:"none", fontFamily:"inherit", width:260 }}/>
             </div>
-            <Btn onClick={()=>setShowNouvelleDemande(true)} variant="success">+ Nouvelle demande</Btn>
+            <Btn onClick={chargerDemandes} variant="secondary">Actualiser</Btn>
           </div>
         </div>
 
@@ -301,26 +312,34 @@ export default function DashboardLaboratoire() {
               </tr>
             </thead>
             <tbody>
-              {demandesFiltrees.length===0?(
+              {chargement ? (
+                <tr>
+                  <td colSpan={7} style={{ padding:"48px", textAlign:"center", color:C.textMuted }}>Chargement…</td>
+                </tr>
+              ) : demandesFiltrees.length===0 ? (
                 <tr>
                   <td colSpan={7} style={{ padding:"60px 40px", textAlign:"center" }}>
                     <p style={{ fontSize:15, fontWeight:600, color:C.textSec, marginBottom:4 }}>Aucune demande dans cette catégorie</p>
-                    <p style={{ fontSize:13, color:C.textMuted }}>{recherche?`Aucun résultat pour "${recherche}"`:"Les demandes apparaîtront ici"}</p>
+                    <p style={{ fontSize:13, color:C.textMuted, maxWidth:420, margin:"0 auto", lineHeight:1.5 }}>
+                      {recherche
+                        ? `Aucun résultat pour « ${recherche} »`
+                        : "Les examens prescrits par un médecin (bouton « Envoyer au laboratoire ») apparaîtront ici avec le nom du patient et la liste des analyses."}
+                    </p>
                   </td>
                 </tr>
-              ):demandesFiltrees.map((d,i,arr)=>(
+              ) : demandesFiltrees.map((d,i,arr)=>(
                 <tr key={d.id} style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none", background:d.urgent?"#fff8f8":"transparent", transition:"background .1s" }}
                   onMouseEnter={e=>e.currentTarget.style.background=d.urgent?C.redSoft:C.slateSoft}
                   onMouseLeave={e=>e.currentTarget.style.background=d.urgent?"#fff8f8":"transparent"}>
                   <td style={{ padding:"11px 12px" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                      <Avatar name={d.patient.nom} size={36}/>
+                      <Avatar name={d.patient?.nom || "?"} size={36}/>
                       <div>
                         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <p style={{ fontSize:13, fontWeight:700, color:C.textPri }}>{d.patient.nom}</p>
+                          <p style={{ fontSize:13, fontWeight:700, color:C.textPri }}>{d.patient?.nom || "—"}</p>
                           {d.urgent&&<span style={{ fontSize:10, fontWeight:800, color:C.red, background:C.redSoft, padding:"1px 6px", borderRadius:6 }}>URGENT</span>}
                         </div>
-                        <p style={{ fontSize:11, color:C.textMuted }}>{d.patient.pid}</p>
+                        <p style={{ fontSize:11, color:C.textMuted }}>{d.patient?.pid || "—"}</p>
                       </div>
                     </div>
                   </td>
@@ -340,7 +359,11 @@ export default function DashboardLaboratoire() {
                     </div>
                   </td>
                   <td style={{ padding:"11px 12px" }}>
-                    <p style={{ fontSize:13, fontWeight:700, color:C.green }}>{d.examens.reduce((s,e)=>s+(e.prix||0),0).toLocaleString("fr-FR")} GNF</p>
+                    {d.tarifsFixes ? (
+                      <p style={{ fontSize:13, fontWeight:700, color:C.green }}>{d.examens.reduce((s,e)=>s+(e.prix||0),0).toLocaleString("fr-FR")} GNF</p>
+                    ) : (
+                      <p style={{ fontSize:12, fontWeight:600, color:C.amber }}>Tarifs à fixer</p>
+                    )}
                   </td>
                   <td style={{ padding:"11px 12px" }}>
                     <Badge statut={d.statut}/>
@@ -350,7 +373,10 @@ export default function DashboardLaboratoire() {
                     <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                       {d.statut==="en_attente"&&(
                         <>
-                          <Btn onClick={()=>handleDemarrerPrelevement(d.id)} small variant="success">
+                          <Btn onClick={()=>setShowTarifs(d)} small variant="primary">
+                            {d.tarifsFixes ? "Modifier tarifs" : "Fixer tarifs"}
+                          </Btn>
+                          <Btn onClick={()=>handleDemarrerPrelevement(d.id)} small variant="success" disabled={!d.tarifsFixes}>
                             <span style={{ display:"inline-flex",alignItems:"center",gap:5 }}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                               Prélever

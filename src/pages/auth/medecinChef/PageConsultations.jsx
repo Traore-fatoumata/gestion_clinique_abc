@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useAuth } from "../../../hooks/useAuth.jsx"
-import { C, Card, Avatar, StatutBadge, Overlay, INIT_MEDECINS, fmt } from "./shared.jsx"
+import { C, Card, Avatar, StatutBadge, Overlay, INIT_MEDECINS, fmt, today } from "./shared.jsx"
+import { estEnAttenteAccueil, consultationPourMedecin, libelleMotifFile, libelleServiceFile } from "../../../utils/clinicFlow.js"
 
 function ModalConsultationChef({ patient, consultation, medecins, onClose, onValider }) {
   const { user } = useAuth()
@@ -11,7 +12,7 @@ function ModalConsultationChef({ patient, consultation, medecins, onClose, onVal
   const [docteurId,    setDocteurId]    = useState(consultation?.docteurId||"")
 
   if (!patient) return null
-  const medecinChoisi = medecins.find(d=>d.id===parseInt(docteurId))
+  const medecinChoisi = medecins.find(d => Number(d.id) === Number(docteurId))
   const ok = !!plaintes
 
   const iSt = { width:"100%", padding:"11px 14px", fontSize:14, border:"1.5px solid "+C.border, borderRadius:10, background:C.white, color:C.textPri, outline:"none", fontFamily:"inherit" }
@@ -201,18 +202,17 @@ export default function PageConsultations({ consultations, patients, file, medec
   // - celles explicitement assignées (`docteurId === currentDoctorId`)
   // - ou celles sans assignation (null) pour lesquelles le chef prend en charge
   const currentDoctorId = Number(user?.id)
-  const fileAccueil = (file || []).filter(f => {
-    if (f.statut === "termine" || f.typeVisite === "rendez_vous") return false
-    const assigned = f.docteurId !== undefined && f.docteurId !== null
-    return assigned ? Number(f.docteurId) === currentDoctorId : true
-  })
+  const fileAccueil = (file || []).filter(f => estEnAttenteAccueil(f, consultations))
 
-  // Consultations du médecin chef non signées → il peut les continuer
-  const mesConsultations = consultations.filter(c => Number(c.docteurId) === currentDoctorId)
+  const todayStr = today()
+  const mesConsultations = consultations.filter(c =>
+    consultationPourMedecin(c, file, currentDoctorId, todayStr)
+  )
   const nonSignees = mesConsultations.filter(c => !c.signe)
 
   const servicesDispo = [...new Set(consultations.map(c=>c.service))].filter(Boolean)
   const toutesFiltrees = [...consultations]
+    .filter(c => c.signe === true)
     .sort((a,b)=>b.date.localeCompare(a.date))
     .filter(c=>{
       const p=patients.find(pt=>pt.id===c.patientId)
@@ -225,7 +225,7 @@ export default function PageConsultations({ consultations, patients, file, medec
   const ONGLETS = [
     { id:"attente",      label:"File d'accueil",      count: fileAccueil.length },
     { id:"mes_consults", label:"Mes consultations",   count: mesConsultations.length, badge: nonSignees.length },
-    { id:"toutes",       label:"Toutes les consultations", count: consultations.length },
+    { id:"toutes",       label:"Toutes les consultations", count: toutesFiltrees.length },
   ]
 
   return (
@@ -305,7 +305,12 @@ export default function PageConsultations({ consultations, patients, file, medec
                     <Avatar name={p.nom} size={44}/>
                     <div style={{ flex:1 }}>
                       <p style={{ fontSize:14, fontWeight:700, color:C.textPri, marginBottom:3 }}>{p.nom}</p>
-                      <p style={{ fontSize:13, color:C.textSec }}>{c.motif||"Pas encore de motif"} · <span style={{ color:C.blue, fontWeight:600 }}>{c.service||"Médecine générale"}</span></p>
+                      <p style={{ fontSize:13, color:C.textSec }}>
+                        {libelleMotifFile(c, paye)}
+                        {libelleServiceFile(c) ? (
+                          <> · <span style={{ color:C.blue, fontWeight:600 }}>{libelleServiceFile(c)}</span></>
+                        ) : null}
+                      </p>
                     </div>
                     {c.arrivee && (
                       <div style={{ textAlign:"center", padding:"8px 16px", background:C.greenSoft, border:"1px solid "+C.green+"33", borderRadius:10 }}>
@@ -468,7 +473,9 @@ export default function PageConsultations({ consultations, patients, file, medec
                         <td style={{ padding:"12px 12px", fontSize:12, color:dr?C.textPri:C.textMuted }}>
                           {dr ? dr.nom : (c.signePar||c.medecinNom||"—")}
                         </td>
-                        <td style={{ padding:"12px 12px" }}><StatutBadge statut={c.statut}/></td>
+                        <td style={{ padding:"12px 12px" }}>
+                          <span style={{ fontSize:11,fontWeight:700,background:C.greenSoft,color:C.green,padding:"3px 10px",borderRadius:20 }}>Signé & validé</span>
+                        </td>
                         <td style={{ padding:"12px 12px" }}>
                           <button onClick={()=>setMModif(c)}
                             style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",background:C.slateSoft,border:"1px solid "+C.slate+"44",borderRadius:8,color:C.slate,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}

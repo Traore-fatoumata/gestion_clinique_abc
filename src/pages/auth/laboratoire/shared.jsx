@@ -59,14 +59,6 @@ export function parseMindrayFile(text) {
 // ══════════════════════════════════════════════════════
 //  DONNÉES
 // ══════════════════════════════════════════════════════
-export const PATIENTS_DB = [
-  { id: 1, pid: "ABC-A1B2C3", nom: "Bah Mariama",     dateNaissance: "1990-03-12", sexe: "F", telephone: "+224 622 11 22 33" },
-  { id: 2, pid: "ABC-D4E5F6", nom: "Diallo Ibrahima", dateNaissance: "1972-07-04", sexe: "M", telephone: "+224 628 44 55 66" },
-  { id: 3, pid: "ABC-G7H8I9", nom: "Sow Fatoumata",   dateNaissance: "1996-11-20", sexe: "F", telephone: "+224 621 77 88 99" },
-  { id: 4, pid: "ABC-J1K2L3", nom: "Kouyaté Mamadou", dateNaissance: "1963-01-15", sexe: "M", telephone: "+224 624 33 44 55" },
-  { id: 5, pid: "ABC-M4N5O6", nom: "Baldé Aissatou",  dateNaissance: "2018-06-08", sexe: "F", telephone: "+224 625 66 77 88" },
-]
-
 export const TYPES_EXAMENS = [
   "Hématologie","Biochimie","Sérologie","Immunologie","Hormonologie",
   "Marqueurs Tumoraux","Bactériologie","Parasitologie","Autre"
@@ -253,71 +245,6 @@ export const buildParamsVides = (nomExamen) => {
   const modeles = PARAMS_PAR_EXAMEN[nomExamen] || [{ nom: "Résultat", unite: "", norme: "" }]
   return Object.fromEntries(modeles.map(p => [p.nom, { valeur: "", unite: p.unite, norme: p.norme }]))
 }
-
-export const DEMANDES_INIT = [
-  {
-    id: 1, patientId: 1, patient: PATIENTS_DB[0],
-    dateDemande: today(), heureDemande: "08:30",
-    medecinPrescripteur: "Dr. Doumbouya", service: "Médecine générale",
-    examens: [{ type: "Hématologie", nom: "NFS (Numération Formule Sanguine)", prix: 25000 }],
-    statut: "termine",
-    datePrelevement: today(), heurePrelevement: "08:45",
-    dateRendu: today(), heureRendu: "11:00",
-    resultats: {
-      "NFS (Numération Formule Sanguine)": {
-        valeurs: {
-          "Hémoglobine":    { valeur: "12.5",   unite: "g/dL",   norme: "12-16"         },
-          "Globules rouges":{ valeur: "4.5",    unite: "M/mm³",  norme: "4-5.5"         },
-          "Globules blancs":{ valeur: "7500",   unite: "/mm³",   norme: "4000-10000"    },
-          "Plaquettes":     { valeur: "250000", unite: "/mm³",   norme: "150000-400000" },
-          "Hématocrite":    { valeur: "38",     unite: "%",      norme: "36-46"         },
-        },
-        commentaire: "Résultats dans les normes"
-      }
-    },
-    valide: true, validePar: "Dr. Kamara", valideLe: today() + " 11:30", urgent: false
-  },
-  {
-    id: 2, patientId: 2, patient: PATIENTS_DB[1],
-    dateDemande: today(), heureDemande: "09:15",
-    medecinPrescripteur: "Dr. Camara", service: "Cardiologie",
-    examens: [
-      { type: "Biochimie", nom: "Glycémie",         prix: 10000 },
-      { type: "Biochimie", nom: "Cholestérol total", prix: 15000 },
-      { type: "Biochimie", nom: "Triglycérides",     prix: 15000 },
-    ],
-    statut: "en_cours",
-    datePrelevement: today(), heurePrelevement: "09:30",
-    dateRendu: null, heureRendu: null,
-    resultats: {}, valide: false, validePar: null, valideLe: null, urgent: false
-  },
-  {
-    id: 3, patientId: 3, patient: PATIENTS_DB[2],
-    dateDemande: today(), heureDemande: "10:00",
-    medecinPrescripteur: "Dr. Keïta", service: "Gynécologie",
-    examens: [
-      { type: "Immunologie", nom: "Test de grossesse (β-HCG)",             prix: 20000 },
-      { type: "Hématologie", nom: "NFS (Numération Formule Sanguine)", prix: 25000 },
-    ],
-    statut: "en_attente",
-    datePrelevement: null, heurePrelevement: null,
-    dateRendu: null, heureRendu: null,
-    resultats: {}, valide: false, validePar: null, valideLe: null, urgent: false
-  },
-  {
-    id: 4, patientId: 4, patient: PATIENTS_DB[3],
-    dateDemande: today(), heureDemande: "10:30",
-    medecinPrescripteur: "Dr. Barry", service: "Diabétologie",
-    examens: [
-      { type: "Biochimie", nom: "Glycémie", prix: 10000 },
-      { type: "Biochimie", nom: "HbA1c",   prix: 30000 },
-    ],
-    statut: "en_attente",
-    datePrelevement: null, heurePrelevement: null,
-    dateRendu: null, heureRendu: null,
-    resultats: {}, valide: false, validePar: null, valideLe: null, urgent: true
-  },
-]
 
 // ══════════════════════════════════════════════════════
 //  COULEURS (unifié avec les autres dashboards)

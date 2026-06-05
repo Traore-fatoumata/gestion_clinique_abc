@@ -9,7 +9,10 @@ import {
 // ══════════════════════════════════════════════════════
 //  MODAL — FORMULAIRE CONSULTATION
 // ══════════════════════════════════════════════════════
-export default function ModalConsultation({ patient, medecin, consultation, onClose, onSauvegarder, onSigner }) {
+export default function ModalConsultation({
+  patient, medecin, consultation, onClose, onSauvegarder, onSigner,
+  prixExamensParLabo = false, attenteResultatsLabo = false, laboValide = false,
+}) {
   const mode = patient?.typeConsultation || consultation?.typeConsultation || "standard"
   const specGyn = isGynecoObst(medecin?.specialite)
   const showPrenatal = specGyn && mode === "prenatal"
@@ -42,11 +45,11 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
 
   const ajouterExamen = (ex) => {
     if (examensCommandes.find(e=>e.nom===ex.nom)) return
-    setExamensCommandes(p=>[...p, { id:Date.now(), nom:ex.nom, prix:ex.prix, categorie:exCat }])
+    setExamensCommandes(p=>[...p, { id:Date.now(), nom:ex.nom, prix: prixExamensParLabo ? 0 : ex.prix, categorie:exCat }])
   }
   const ajouterCustom = () => {
     if (!exCustomNom.trim()) return
-    setExamensCommandes(p=>[...p, { id:Date.now(), nom:exCustomNom.trim(), prix:parseInt(exCustomPrix)||0, categorie:"Autre" }])
+    setExamensCommandes(p=>[...p, { id:Date.now(), nom:exCustomNom.trim(), prix: prixExamensParLabo ? 0 : (parseInt(exCustomPrix)||0), categorie:"Autre" }])
     setExCustomNom(""); setExCustomPrix("")
   }
   const supprimerExamen = (id) => setExamensCommandes(p=>p.filter(e=>e.id!==id))
@@ -85,8 +88,16 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
 
   const parseList = str => str.split(",").map(x=>x.trim()).filter(Boolean)
 
-  const valider = (signer) => {
+  const aDesExamens = examensCommandes.length > 0
+  const peutSigner = !aDesExamens || laboValide
+  const doitEnvoyerLabo = aDesExamens && !attenteResultatsLabo
+
+  const valider = (signer, envoyerLabo = false) => {
     if (!form.plaintes.trim()) { alert("Les plaintes du patient sont obligatoires."); return }
+    if (signer && aDesExamens && !laboValide) {
+      alert("Impossible de signer tant que le laboratoire n'a pas validé les résultats des examens.")
+      return
+    }
     if (signer && !form.diagDefinitif.trim()) { alert("Le diagnostic définitif est obligatoire pour signer."); return }
     if (showPrenatal && !prenatal.ddr.trim() && !prenatal.termeSA.trim()) {
       alert("Pour une CPN, indiquez au minimum la DDR ou le terme (semaines d'aménorrhée)."); return
@@ -115,7 +126,7 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
       ...(showAcc && { donneesAccouchement: { ...accouch } }),
     }
     if (signer) onSigner(data)
-    else onSauvegarder(data)
+    else onSauvegarder({ ...data, envoyerLabo })
   }
 
   return (
@@ -466,7 +477,11 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
                 <div>
                   <p style={{ fontSize:14, fontWeight:700, color:C.textPri }}>Examens demandés</p>
                   <p style={{ fontSize:11, color:C.textSec }}>
-                    {examensCommandes.length === 0 ? "Aucun examen — cliquez pour en prescrire" : `${examensCommandes.length} examen${examensCommandes.length>1?"s":""} · Frais : ${fraisExamens.toLocaleString("fr-FR")} GNF`}
+                    {examensCommandes.length === 0
+                      ? "Aucun examen — cliquez pour en prescrire"
+                      : prixExamensParLabo
+                        ? `${examensCommandes.length} examen${examensCommandes.length>1?"s":""} — tarifs fixés par le laboratoire`
+                        : `${examensCommandes.length} examen${examensCommandes.length>1?"s":""} · Frais : ${fraisExamens.toLocaleString("fr-FR")} GNF`}
                   </p>
                 </div>
               </div>
@@ -494,7 +509,7 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
                     return (
                       <button key={ex.nom} type="button" onClick={()=>ajouterExamen(ex)} disabled={!!deja}
                         style={{ padding:"4px 10px", background:deja?C.greenSoft:C.white, color:deja?C.green:C.textPri, border:"1px solid "+(deja?C.green:C.border), borderRadius:20, fontSize:11, fontWeight:600, cursor:deja?"default":"pointer", opacity:deja?.7:1 }}>
-                        {deja&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:4 }}><polyline points="20 6 9 17 4 12"/></svg>}{ex.nom} — {ex.prix.toLocaleString("fr-FR")} GNF
+                        {deja&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:4 }}><polyline points="20 6 9 17 4 12"/></svg>}{ex.nom}{!prixExamensParLabo && ` — ${ex.prix.toLocaleString("fr-FR")} GNF`}
                       </button>
                     )
                   })}
@@ -505,9 +520,11 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
                     <input value={exCustomNom} onChange={e=>setExCustomNom(e.target.value)} placeholder="Nom de l'examen"
                       style={{ ...inputSt, flex:2, padding:"8px 12px", fontSize:12 }}
                       onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
+                    {!prixExamensParLabo && (
                     <input value={exCustomPrix} onChange={e=>setExCustomPrix(e.target.value)} placeholder="Prix (GNF)" type="number" min="0"
                       style={{ ...inputSt, flex:1, padding:"8px 12px", fontSize:12 }}
                       onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
+                    )}
                     <button type="button" onClick={ajouterCustom}
                       style={{ padding:"8px 14px", background:C.blue, color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
                       + Ajouter
@@ -527,10 +544,14 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
                       <span style={{ fontSize:10, fontWeight:700, background:C.blueSoft, color:C.blue, padding:"1px 7px", borderRadius:10 }}>{ex.categorie}</span>
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+                      {prixExamensParLabo
+                        ? <span style={{ fontSize:11, color:C.textMuted, fontStyle:"italic" }}>Tarif labo</span>
+                        : <>
                       <input value={ex.prix} onChange={e=>updateExamenPrix(ex.id,e.target.value)} type="number" min="0"
                         style={{ width:110, padding:"5px 8px", fontSize:12, border:"1px solid "+C.border, borderRadius:8, textAlign:"right", fontFamily:"inherit" }}
                         onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
                       <span style={{ fontSize:11, color:C.textMuted, minWidth:30 }}>GNF</span>
+                      </>}
                       <button type="button" onClick={()=>supprimerExamen(ex.id)}
                         style={{ width:28, height:28, borderRadius:6, border:"1px solid "+C.red+"44", background:C.redSoft, color:C.red, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -538,9 +559,11 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
                     </div>
                   </div>
                 ))}
+                {!prixExamensParLabo && (
                 <div style={{ display:"flex", justifyContent:"flex-end", padding:"8px 4px 0", borderTop:"1px solid "+C.border, marginTop:4 }}>
                   <p style={{ fontSize:13, fontWeight:700, color:C.blue }}>Total frais examens : {fraisExamens.toLocaleString("fr-FR")} GNF</p>
                 </div>
+                )}
               </div>
             )}
           </div>
@@ -731,15 +754,22 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               Imprimer ordonnance
             </Btn>
-            <div style={{ display:"flex", gap:10 }}>
+            {aDesExamens && attenteResultatsLabo && !laboValide && (
+              <p style={{ fontSize:12, color:C.amber, marginBottom:10, padding:"8px 12px", background:C.amberSoft, borderRadius:8 }}>
+                Examens au laboratoire — signature après validation des résultats.
+              </p>
+            )}
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
               <Btn onClick={onClose} variant="secondary">Annuler</Btn>
-              <Btn onClick={()=>valider(false)} variant="secondary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Sauvegarder
-              </Btn>
-              <Btn onClick={()=>valider(true)} variant="success">
-                Signer &amp; Valider
-              </Btn>
+              <Btn onClick={()=>valider(false)} variant="secondary">Sauvegarder</Btn>
+              {doitEnvoyerLabo && (
+                <Btn onClick={()=>valider(false, true)} variant="primary">Envoyer au laboratoire</Btn>
+              )}
+              {peutSigner && (
+                <Btn onClick={()=>valider(true)} variant="success">
+                  {aDesExamens ? "Signer après résultats" : "Signer & Valider"}
+                </Btn>
+              )}
             </div>
           </div>
         </div>

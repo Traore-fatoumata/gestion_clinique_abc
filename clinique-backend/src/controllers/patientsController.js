@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 // ── Générer un PID unique ────────────────────────────────
 const genPid = async () => {
   const num = Math.floor(100000 + Math.random() * 900000)
-  const pid = `P-${num}`
+  const pid = `ABC-${num}`
   const { rows } = await pool.query("SELECT id FROM patients WHERE pid = $1", [pid])
   if (rows.length > 0) return genPid() // collision rare → retry
   return pid
@@ -74,19 +74,6 @@ const creerPatient = async (req, res) => {
     return res.status(400).json({ success: false, message: "Le nom est obligatoire." })
 
   try {
-    // Vérifier doublon par nom exact (insensible à la casse)
-    const doublon = await pool.query(
-      "SELECT id, pid FROM patients WHERE LOWER(nom) = LOWER($1)",
-      [nom.trim()]
-    )
-    if (doublon.rows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: `Patient déjà enregistré sous le dossier ${doublon.rows[0].pid}.`,
-        patient: doublon.rows[0],
-      })
-    }
-
     const pid = await genPid()
     const { rows } = await pool.query(
       `INSERT INTO patients (pid, nom, date_naissance, sexe, telephone, quartier, secteur, profession, responsable)

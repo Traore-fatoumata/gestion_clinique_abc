@@ -9,7 +9,10 @@ import {
 // ══════════════════════════════════════════════════════
 //  MODAL — FORMULAIRE CONSULTATION
 // ══════════════════════════════════════════════════════
-export default function ModalConsultation({ patient, medecin, consultation, onClose, onSauvegarder, onSigner }) {
+export default function ModalConsultation({
+  patient, medecin, consultation, onClose, onSauvegarder, onSigner,
+  attenteResultatsLabo = false, laboValide = false, prixExamensParLabo = false,
+}) {
   const mode = patient?.typeConsultation || consultation?.typeConsultation || "standard"
   const specGyn = isGynecoObst(medecin?.specialite)
   const showPrenatal = specGyn && mode === "prenatal"
@@ -84,8 +87,16 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
 
   const parseList = str => str.split(",").map(x=>x.trim()).filter(Boolean)
 
-  const valider = (signer) => {
+  const aDesExamens = examensCommandes.length > 0
+  const peutSigner = !aDesExamens || laboValide
+  const doitEnvoyerLabo = aDesExamens && !attenteResultatsLabo
+
+  const valider = (signer, envoyerLabo = false) => {
     if (!form.plaintes.trim()) { alert("Les plaintes du patient sont obligatoires."); return }
+    if (signer && aDesExamens && !laboValide) {
+      alert("Impossible de signer tant que le laboratoire n'a pas validé les résultats des examens.")
+      return
+    }
     if (signer && !form.diagDefinitif.trim()) { alert("Le diagnostic définitif est obligatoire pour signer."); return }
     if (showPrenatal && !prenatal.ddr.trim() && !prenatal.termeSA.trim()) {
       alert("Pour une CPN, indiquez au minimum la DDR ou le terme (semaines d'aménorrhée)."); return
@@ -113,7 +124,7 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
       ...(showAcc && { donneesAccouchement: { ...accouch } }),
     }
     if (signer) onSigner(data)
-    else onSauvegarder(data)
+    else onSauvegarder({ ...data, envoyerLabo })
   }
 
   return (
@@ -722,15 +733,29 @@ export default function ModalConsultation({ patient, medecin, consultation, onCl
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               Imprimer ordonnance
             </Btn>
-            <div style={{ display:"flex", gap:10 }}>
+            {aDesExamens && attenteResultatsLabo && !laboValide && (
+              <p style={{ fontSize:12, color:C.amber, marginBottom:10, padding:"8px 12px", background:"#fef3c7", borderRadius:8 }}>
+                Examens envoyés au laboratoire — en attente des résultats avant signature.
+              </p>
+            )}
+            {laboValide && aDesExamens && (
+              <p style={{ fontSize:12, color:C.green, marginBottom:10, padding:"8px 12px", background:"#dcfce7", borderRadius:8 }}>
+                Résultats du laboratoire disponibles — vous pouvez signer et valider.
+              </p>
+            )}
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
               <Btn onClick={onClose} variant="secondary">Annuler</Btn>
-              <Btn onClick={()=>valider(false)} variant="secondary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Sauvegarder
-              </Btn>
-              <Btn onClick={()=>valider(true)} variant="success">
-                Signer &amp; Valider
-              </Btn>
+              <Btn onClick={()=>valider(false)} variant="secondary">Sauvegarder</Btn>
+              {doitEnvoyerLabo && (
+                <Btn onClick={()=>valider(false, true)} variant="primary">
+                  Envoyer au laboratoire
+                </Btn>
+              )}
+              {peutSigner && (
+                <Btn onClick={()=>valider(true)} variant="success">
+                  {aDesExamens ? "Signer après résultats" : "Signer & Valider"}
+                </Btn>
+              )}
             </div>
           </div>
         </div>

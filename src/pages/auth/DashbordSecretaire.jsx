@@ -9,6 +9,7 @@ import ModalNouveauPatient from "./secretaire/ModalNouveauPatient.jsx"
 import ModalRechercheDossier from "./secretaire/ModalRechercheDossier.jsx"
 import ModalPermission from "./secretaire/ModalPermission.jsx"
 import ModalHistorique from "./secretaire/ModalHistorique.jsx"
+import { estEnAttenteAccueil } from "../../utils/clinicFlow.js"
 
 // ══════════════════════════════════════════════════════
 //  COMPOSANT PRINCIPAL
@@ -18,10 +19,10 @@ export default function DashboardSecretaire() {
   const navigate   = useNavigate()
   const handleLogout = () => { logout(); navigate("/login") }
 
-  const { patients, addPatient, file, addToFile, rdv: rdvs, updateRdv, addNotif } = useSharedData()
+  const { patients, addPatient, file, addToFile, rdv: rdvs, updateRdv, addNotif, consultations } = useSharedData()
 
-  // Patients actifs (en attente / en salle / en consultation) — exclut les consultés
-  const fileActif = file.filter(f => f.statut !== "termine")
+  // File accueil : pas assigné à un médecin et pas encore trié aujourd'hui
+  const fileActif = file.filter(f => estEnAttenteAccueil(f, consultations))
 
   const [onglet,       setOnglet]       = useState("accueil")
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
@@ -62,11 +63,6 @@ export default function DashboardSecretaire() {
 
   const handleEnregistrer = async (form) => {
     const fullNom = form.nom.trim()+" "+form.prenom.trim()
-    const existing = patients.find(p=>p.nom.toLowerCase()===fullNom.toLowerCase())
-    if (existing) {
-      alert(""+fullNom+" est déjà enregistré ("+existing.pid+"). Utilisez 'Rechercher dossier' pour le signaler au médecin chef.")
-      setShowNouveau(false); return
-    }
 
     let age=form.age||""
     if (!age&&form.dateNaissance) { const a=Math.floor((Date.now()-new Date(form.dateNaissance))/(365.25*24*3600*1000)); age=a+" ans" }
@@ -95,6 +91,8 @@ export default function DashboardSecretaire() {
         statut: "en_attente",
         montantConsultation: montantForFile,
         paiementConsultation: null,
+        motif: "Consultation — accueil",
+        service: "Accueil",
       })
       setShowNouveau(false)
       alert(""+fullNom+" enregistré et ajouté à la file du médecin chef.")

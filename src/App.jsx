@@ -35,7 +35,7 @@ function AppRoutes() {
         <PrivateRoute role="medecin"><DashboardMedecin /></PrivateRoute>
       }/>
       <Route path="/laboratoire" element={
-        <PrivateRoute role="laborantin"><DashboardLaboratoire /></PrivateRoute>
+        <PrivateRoute role="labo"><DashboardLaboratoire /></PrivateRoute>
       }/>
       <Route path="/soins-infirmiers" element={
         <PrivateRoute role="infirmier"><DashboardSoinsInfirmiers /></PrivateRoute>

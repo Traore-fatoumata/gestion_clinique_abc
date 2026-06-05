@@ -16,7 +16,7 @@ export default function DashboardMedecin() {
   const navigate   = useNavigate()
   const handleLogout = () => { logout(); navigate("/login") }
 
-  const { patients: sharedPatients, consultations: sharedConsultations, updateConsultation, addConsultation, file, updateFileEntry, rdv, addRdv, removeRdv, notifs, marquerNotifLue, marquerToutesLues } = useSharedData()
+  const { patients: sharedPatients, consultations: sharedConsultations, addConsultation, file, updateFileEntry, rdv, addRdv, removeRdv, notifs, marquerNotifLue, marquerToutesLues, rafraichir } = useSharedData()
 
   const medecin = { id: user?.id || 2, nom: user?.nom || "Dr. Keïta", specialite: user?.specialite || "Médecine générale" }
 
@@ -33,6 +33,17 @@ export default function DashboardMedecin() {
   const [recherche, setRecherche]         = useState("")
   const [mFiche,   setMFiche]             = useState(null)
   const [mConsult, setMConsult]           = useState(null)
+
+  useEffect(() => {
+    if (!mConsult?.patient?.id) return
+    const todayStr = today()
+    const fresh = sharedConsultations.find(c =>
+      Number(c.patientId) === Number(mConsult.patient.id)
+      && (c.date?.slice(0, 10) || c.date) === todayStr
+      && Number(c.docteurId) === Number(medecin.id)
+    )
+    if (fresh) setMConsult(prev => prev ? { ...prev, consultation: fresh } : prev)
+  }, [sharedConsultations, mConsult?.patient?.id, medecin.id])
 
   useEffect(()=>{
     const tick=()=>{
@@ -64,12 +75,28 @@ export default function DashboardMedecin() {
       }))
   ].sort((a,b) => (a.heure || "").localeCompare(b.heure || ""))
 
-  const mesPatients = file
-    .filter(f => f.docteurId === Number(medecin.id) && f.statut !== "termine")
-    .map(f => {
-      const pat = sharedPatients.find(sp => sp.id === f.patientId) || {}
-      return { ...pat, ...f, id: f.patientId, fileId: f.id }
+  const mesPatients = (() => {
+    const byPatient = new Map()
+    const todayStr = today()
+    consultations.forEach(c => {
+      if (Number(c.docteurId) !== Number(medecin.id)) return
+      if ((c.date?.slice(0, 10) || c.date) !== todayStr) return
+      if (c.signe) return
+      const pat = sharedPatients.find(p => p.id === c.patientId) || {}
+      const f = file.find(x => x.patientId === c.patientId && x.statut !== "termine") || {}
+      byPatient.set(c.patientId, { ...pat, ...f, id: c.patientId, fileId: f.id, consultation: c })
     })
+    file.forEach(f => {
+      if (Number(f.docteurId) !== Number(medecin.id) || f.statut === "termine") return
+      if (byPatient.has(f.patientId)) return
+      const pat = sharedPatients.find(p => p.id === f.patientId) || {}
+      const c = consultations.find(x =>
+        x.patientId === f.patientId && (x.date?.slice(0, 10) || x.date) === todayStr && Number(x.docteurId) === Number(medecin.id)
+      )
+      byPatient.set(f.patientId, { ...pat, ...f, id: f.patientId, fileId: f.id, consultation: c || null })
+    })
+    return [...byPatient.values()]
+  })()
 
   const mesConsultations= consultations.filter(c=>Number(c.docteurId)===Number(medecin.id))
   const enAttente       = mesPatients.filter(p=>p.statut==="en_attente").length
@@ -82,47 +109,64 @@ export default function DashboardMedecin() {
   })
 
   const ouvrirConsultation = (patient) => {
-    const existing = consultations.find(c=>c.patientId===patient.id&&c.date===today()&&Number(c.docteurId)===Number(medecin.id))
-    setMConsult({ patient, consultation:existing||null })
+    const todayStr = today()
+    const existing = patient.consultation || consultations.find(c =>
+      Number(c.patientId) === Number(patient.id) &&
+      (c.date?.slice(0, 10) || c.date) === todayStr &&
+      Number(c.docteurId) === Number(medecin.id)
+    )
+    setMConsult({ patient, consultation: existing || null })
   }
 
-  const handleSauvegarder = (data) => {
+  const handleSauvegarder = async (data) => {
     const patientId = mConsult.patient.id
-    const existing  = consultations.find(c=>c.patientId===patientId&&c.date===today()&&c.docteurId===medecin.id)
-    if (existing) {
-      updateConsultation(existing.id, data)
-    } else {
-      addConsultation({ patientId, date:today(), service:medecin.specialite, docteurId:medecin.id, signe:false, signeLe:null, ...data })
-    }
-    const fileEntry = file.find(f=>f.patientId===patientId && f.statut !== "termine")
-    if (fileEntry && (data.fraisExamens || 0) > 0) {
-      updateFileEntry(fileEntry.id, { fraisExamens: data.fraisExamens, examensCommandes: data.examensCommandes })
-    }
-    setMConsult(null)
-    alert("Consultation sauvegardée.")
-  }
-
-  const handleSigner = (data) => {
-    const patientId = mConsult.patient.id
-    const ts        = new Date().toLocaleString("fr-FR")
-    const existing  = consultations.find(c=>c.patientId===patientId&&c.date===today()&&c.docteurId===medecin.id)
-    if (existing) {
-      updateConsultation(existing.id, { ...data, signe:true, signeLe:ts })
-    } else {
-      addConsultation({ patientId, date:today(), service:medecin.specialite, docteurId:medecin.id, signe:true, signeLe:ts, ...data })
-    }
-    const fileEntry = file.find(f=>f.patientId===patientId)
-    if (fileEntry) {
-      updateFileEntry(fileEntry.id, {
-        statut: "termine",
-        ...(((data.fraisExamens || 0) > 0) && { fraisExamens: data.fraisExamens, examensCommandes: data.examensCommandes }),
+    try {
+      await addConsultation({
+        patientId,
+        date: today(),
+        service: medecin.specialite,
+        docteurId: medecin.id,
+        signe: false,
+        envoyerLabo: data.envoyerLabo === true,
+        ...data,
       })
+      if (rafraichir) await rafraichir()
+      alert(data.envoyerLabo
+        ? "Examens envoyés au laboratoire. Vous pourrez signer après les résultats."
+        : "Consultation sauvegardée — vos données sont conservées.")
+    } catch (e) {
+      alert(e.message || "Erreur de sauvegarde.")
     }
-    setMConsult(null)
-    const msg = (data.fraisExamens||0) > 0
-      ? `Consultation signée. Frais d'examens : ${data.fraisExamens.toLocaleString("fr-FR")} GNF — orienter le patient vers la comptabilité.`
-      : "Consultation signée et validée."
-    alert(msg)
+  }
+
+  const handleSigner = async (data) => {
+    const patientId = mConsult.patient.id
+    const c = mConsult.consultation
+    if ((data.examensCommandes?.length > 0) && !c?.laboValide) {
+      alert("Signature impossible : résultats du laboratoire non validés.")
+      return
+    }
+    const ts = new Date().toLocaleString("fr-FR")
+    try {
+      await addConsultation({
+        patientId,
+        date: today(),
+        service: medecin.specialite,
+        docteurId: medecin.id,
+        signe: true,
+        signeLe: ts,
+        signePar: medecin.nom,
+        ...data,
+      })
+      const fileEntry = file.find(f => f.patientId === patientId && f.statut !== "termine")
+      if (fileEntry) {
+        await updateFileEntry(fileEntry.id, { statut: "termine" })
+      }
+      setMConsult(null)
+      alert("Consultation signée et validée.")
+    } catch (e) {
+      alert(e.message || "Erreur lors de la signature.")
+    }
   }
 
   const handleCreerRdv = (form) => {
@@ -174,6 +218,9 @@ export default function DashboardMedecin() {
           onClose={()=>setMConsult(null)}
           onSauvegarder={handleSauvegarder}
           onSigner={handleSigner}
+          prixExamensParLabo
+          attenteResultatsLabo={mConsult.consultation?.attenteResultatsLabo}
+          laboValide={mConsult.consultation?.laboValide}
         />
       )}
 

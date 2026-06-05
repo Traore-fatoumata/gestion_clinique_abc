@@ -91,7 +91,7 @@ const getFile = async (req, res) => {
         note:    r.paiement_consultation_note,
         date:    r.paiement_consultation_date,
       } : null,
-      fraisExamens:    r.examens_total || 0,
+      fraisExamens:    (examensMap[r.id] || []).reduce((s, e) => s + (Number(e.prix) || 0), 0) || Number(r.examens_total) || 0,
       examensCommandes: examensMap[r.id] || [],
       paiementExamens: r.examens_statut ? {
         montantPaye: r.examens_paye,
@@ -191,7 +191,7 @@ const ajouterFile = async (req, res) => {
 // ────────────────────────────────────────────────────────
 const updateFile = async (req, res) => {
   const {
-    statut, medecin_id, frais_examens,
+    statut, medecin_id, frais_examens, service, motif,
     examens_commandes,           // [{nom, prix}]
     paiement_consultation,       // {statut, montant, methode, note}
     paiement_examens,            // {montant_paye, statut, methode, note}
@@ -208,7 +208,12 @@ const updateFile = async (req, res) => {
     let idx = 1
 
     if (statut)     { champs.push(`statut=$${idx++}`);     vals.push(statut) }
-    if (medecin_id) { champs.push(`medecin_id=$${idx++}`); vals.push(medecin_id) }
+    if (medecin_id !== undefined && medecin_id !== null) {
+      champs.push(`medecin_id=$${idx++}`)
+      vals.push(medecin_id)
+    }
+    if (service)    { champs.push(`service=$${idx++}`);    vals.push(service) }
+    if (motif !== undefined) { champs.push(`motif=$${idx++}`); vals.push(motif || null) }
     if (frais_examens !== undefined) { champs.push(`updated_at=NOW()`); }
     if (montant_consultation !== undefined) { champs.push(`montant_consultation=$${idx++}`); vals.push(montant_consultation) }
 

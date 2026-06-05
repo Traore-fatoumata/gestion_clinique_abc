@@ -1,14 +1,27 @@
 const pool = require("../config/db")
+const { notifyUtilisateur } = require("../services/notificationService")
 
 // GET /api/notifications — notifs du médecin connecté
 const getNotifications = async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, docteur_id, titre, patient_nom, motif, service, lu, created_at
+      `SELECT id, docteur_id, titre, patient_nom, motif, service, lu, created_at, type_notif, patient_id
        FROM notifications WHERE docteur_id=$1 ORDER BY created_at DESC LIMIT 50`,
       [req.user.id]
     )
-    return res.json({ success: true, notifications: rows })
+    const notifications = rows.map(r => ({
+      id:         r.id,
+      docteurId:  r.docteur_id,
+      titre:      r.titre,
+      patientNom: r.patient_nom,
+      motif:      r.motif,
+      service:    r.service,
+      lu:         r.lu,
+      typeNotif:  r.type_notif,
+      patientId:  r.patient_id,
+      createdAt:  r.created_at,
+    }))
+    return res.json({ success: true, notifications })
   } catch (err) {
     console.error("getNotifications:", err)
     return res.status(500).json({ success: false, message: "Erreur serveur." })
@@ -17,13 +30,16 @@ const getNotifications = async (req, res) => {
 
 // POST /api/notifications — créer une notif (secrétaire/chef)
 const creerNotification = async (req, res) => {
-  const { docteur_id, titre, patient_nom, motif, service } = req.body
+  const { docteur_id, titre, patient_nom, motif, service, type_notif, patient_id } = req.body
   try {
-    await pool.query(
-      `INSERT INTO notifications (docteur_id, titre, patient_nom, motif, service)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [docteur_id, titre || "Nouveau patient assigné", patient_nom, motif || null, service || null]
-    )
+    await notifyUtilisateur(docteur_id, {
+      titre:       titre || "Nouveau patient assigné",
+      patient_nom,
+      motif,
+      service,
+      type_notif:  type_notif || "assignation",
+      patient_id,
+    })
     return res.status(201).json({ success: true })
   } catch (err) {
     console.error("creerNotification:", err)

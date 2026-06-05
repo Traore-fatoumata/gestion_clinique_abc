@@ -1,4 +1,5 @@
 const pool = require("../config/db")
+const { notifyUtilisateur } = require("../services/notificationService")
 
 // ────────────────────────────────────────────────────────
 //  GET /api/rdv  — liste les RDV (filtrés par médecin/date)
@@ -80,6 +81,16 @@ const creerRdv = async (req, res) => {
     )
 
     const r = full[0]
+
+    await notifyUtilisateur(medecin_id, {
+      titre:       `Nouveau rendez-vous — ${r.patient_nom}`,
+      patient_nom: r.patient_nom,
+      motif:       `${r.date_rdv} à ${r.heure_rdv?.slice(0, 5) || ""} — ${motif || "Consultation"}`,
+      service:     r.service || r.specialite,
+      type_notif:  "rdv",
+      patient_id:  patient_id,
+    })
+
     return res.status(201).json({
       success: true,
       rdv: {

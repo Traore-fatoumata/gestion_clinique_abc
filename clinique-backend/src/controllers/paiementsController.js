@@ -161,6 +161,30 @@ const getStatistiques = async (req, res) => {
       ORDER BY f.date_entree DESC
     `)
 
+    // Recette du Jour
+    const { rows: jourRows } = await pool.query(`
+      SELECT 
+        (SELECT COALESCE(SUM(montant), 0) FROM paiements_consultation WHERE date_paiement = CURRENT_DATE) as consult,
+        (SELECT COALESCE(SUM(montant_paye), 0) FROM paiements_examens WHERE date_paiement = CURRENT_DATE) as examens
+    `)
+    const recetteJour = Number(jourRows[0].consult) + Number(jourRows[0].examens)
+
+    // Recette du Mois
+    const { rows: moisRows } = await pool.query(`
+      SELECT 
+        (SELECT COALESCE(SUM(montant), 0) FROM paiements_consultation WHERE DATE_TRUNC('month', date_paiement) = DATE_TRUNC('month', CURRENT_DATE)) as consult,
+        (SELECT COALESCE(SUM(montant_paye), 0) FROM paiements_examens WHERE DATE_TRUNC('month', date_paiement) = DATE_TRUNC('month', CURRENT_DATE)) as examens
+    `)
+    const recetteMois = Number(moisRows[0].consult) + Number(moisRows[0].examens)
+
+    // Recette Totale
+    const { rows: totalRows } = await pool.query(`
+      SELECT 
+        (SELECT COALESCE(SUM(montant), 0) FROM paiements_consultation) as consult,
+        (SELECT COALESCE(SUM(montant_paye), 0) FROM paiements_examens) as examens
+    `)
+    const recetteTotal = Number(totalRows[0].consult) + Number(totalRows[0].examens)
+
     const stats = statsRows[0]
     const activite = activiteRows
 
@@ -172,7 +196,10 @@ const getStatistiques = async (req, res) => {
         nbPaiements: parseInt(stats.total_paiements_consultation) + parseInt(stats.total_paiements_examens),
         tauxRecouvrement: stats.total_encaisse_consultation > 0 
           ? Math.round((parseInt(stats.total_encaisse_consultation) / (parseInt(stats.total_encaisse_consultation) + parseInt(stats.total_attente_consultation))) * 100)
-          : 0
+          : 0,
+        recetteJour,
+        recetteMois,
+        recetteTotal
       },
       activite
     })
@@ -291,9 +318,9 @@ const enregistrerPaiementConsultation = async (req, res) => {
       [file_id, patient_id, montant, methode || 'cash', note || '', date_paiement || new Date().toISOString().slice(0, 10)]
     )
 
-    // Mettre à jour le statut de la file d'attente
+    // Garder le patient en file (triage / consultation) — le statut « termine » vient de la signature médicale
     await pool.query(
-      `UPDATE file_attente SET statut = 'termine' WHERE id = $1`,
+      `UPDATE file_attente SET statut = 'en_attente', updated_at = NOW() WHERE id = $1`,
       [file_id]
     )
 

@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { useAuth } from "./useAuth"
+import { buildDonneesBrouillon } from "../utils/clinicFlow.js"
 
 const SharedDataContext = createContext(null)
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -47,7 +48,13 @@ export function SharedDataProvider({ children }) {
         apiFetch("/api/notifications"),
         apiFetch("/api/rdv"),
       ])
-      if (patientsRes.status === "fulfilled") setPatients(patientsRes.value.patients || [])
+      if (patientsRes.status === "fulfilled") {
+        const mapped = (patientsRes.value.patients || []).map(p => ({
+          ...p,
+          dateNaissance: p.date_naissance || p.dateNaissance || null,
+        }))
+        setPatients(mapped)
+      }
       if (fileRes.status      === "fulfilled") setFile(fileRes.value.file || [])
       if (consultsRes.status  === "fulfilled") setConsultations(consultsRes.value.consultations || [])
       if (notifsRes.status    === "fulfilled") setNotifs(notifsRes.value.notifications || [])
@@ -102,7 +109,14 @@ export function SharedDataProvider({ children }) {
         responsable:    data.responsable || null,
       }),
     })
-    if (res.success) { setPatients(prev => [res.patient, ...prev]); return res.patient }
+    if (res.success) {
+      const mappedPatient = {
+        ...res.patient,
+        dateNaissance: res.patient.date_naissance || res.patient.dateNaissance || null,
+      }
+      setPatients(prev => [mappedPatient, ...prev])
+      return mappedPatient
+    }
     throw new Error(res.message)
   }, [apiFetch])
 
@@ -137,6 +151,8 @@ export function SharedDataProvider({ children }) {
     // Médecin assigné — supporte medecin_id ET docteurId
     if (data.medecin_id !== undefined) payload.medecin_id = data.medecin_id
     if (data.docteurId  !== undefined) payload.medecin_id = data.docteurId
+    if (data.service !== undefined) payload.service = data.service
+    if (data.motif !== undefined) payload.motif = data.motif
 
     // Examens
     if (data.fraisExamens !== undefined) {
@@ -194,22 +210,40 @@ export function SharedDataProvider({ children }) {
         medecin_id:        data.docteurId,
         date:              data.date,
         service:           data.service,
-        motif:             data.motif,
+        motif:             data.motif || data.plaintes,
         plaintes:          data.plaintes,
         diagnostics:       data.diagnostics || [],
         traitements:       data.traitements || [],
         frais_examens:     data.fraisExamens || 0,
         type_consultation: data.typeConsultation || "standard",
         examens_commandes: data.examensCommandes || [],
+        signe:             data.signe === true,
+        signe_par:         data.signePar || null,
+        envoyer_labo:      data.envoyerLabo === true,
+        donnees_brouillon: data.donneesBrouillon || buildDonneesBrouillon(data),
       }),
     })
     if (res.success) { await chargerDonnees(); return res.consultationId }
     throw new Error(res.message)
   }, [apiFetch, chargerDonnees])
 
+  const signerConsultation = useCallback(async (consultationId, signePar) => {
+    await apiFetch(`/api/consultations/${consultationId}/signer`, {
+      method: "PATCH",
+      body: JSON.stringify({ signe_par: signePar }),
+    })
+    await chargerDonnees()
+  }, [apiFetch, chargerDonnees])
+
   const updateConsultation = useCallback(async (id, data) => {
     await addConsultation({ ...data, id })
   }, [addConsultation])
+
+  const deleteConsultation = useCallback(async (id) => {
+    await apiFetch(`/api/consultations/${id}`, { method: "DELETE" })
+    setConsultations(prev => prev.filter(c => c.id !== id))
+    await chargerDonnees()
+  }, [apiFetch, chargerDonnees])
 
   // ── RDV ─────────────────────────────────────────────────
   const addRdv = useCallback(async (data) => {
@@ -279,13 +313,14 @@ export function SharedDataProvider({ children }) {
       patients, file, consultations, rdv, notifs, resultatsLabo, soins, loading,
       addPatient,
       addToFile, updateFileEntry,
-      addConsultation, updateConsultation,
+      addConsultation, updateConsultation, deleteConsultation, signerConsultation,
       addRdv, updateRdv, removeRdv,
       addNotif, marquerNotifLue, marquerToutesLues,
       addResultatLabo, updateResultatLabo,
       // Test helpers
       resetAppDataForTest,
       rafraichir: chargerDonnees,
+      apiFetch,
     }}>
       {children}
     </SharedDataContext.Provider>

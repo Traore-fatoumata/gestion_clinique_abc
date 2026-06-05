@@ -13,6 +13,7 @@ import PageComptes       from "./medecinChef/PageComptes.jsx"
 import PagePresence      from "./medecinChef/PagePresence.jsx"
 import PageHistorique    from "./medecinChef/PageHistorique.jsx"
 import ModalConsultation from "./medecinChef/ModalConsultation.jsx"
+import { buildDonneesBrouillon, consultationPourMedecin } from "../../utils/clinicFlow.js"
 
 export default function DashboardMedecinChef() {
   const { user, logout } = useAuth()
@@ -21,9 +22,9 @@ export default function DashboardMedecinChef() {
 
   const {
     patients: sharedPatients, consultations: sharedConsultations,
-    addConsultation, updateConsultation, file, updateFileEntry,
-    addNotif, resultatsLabo, soins, rdv
-  , resetAppDataForTest } = useSharedData()
+    addConsultation, updateConsultation, deleteConsultation, signerConsultation, file, updateFileEntry,
+    addNotif, resultatsLabo, soins, rdv, rafraichir
+  } = useSharedData()
 
   const [page,         setPage]         = useState("accueil")
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
@@ -31,6 +32,18 @@ export default function DashboardMedecinChef() {
   const patients      = sharedPatients
   const [comptes,      setComptes]      = useState(INIT_COMPTES)
   const [medecins,     setMedecins]     = useState(INIT_MEDECINS)
+
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+  useEffect(() => {
+    const token = localStorage.getItem("clinique_token")
+    if (!token) return
+    fetch(`${API_URL}/api/utilisateurs/medecins`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(res => { if (res.success && res.medecins?.length) setMedecins(res.medecins) })
+      .catch(() => {})
+  }, [API_URL])
   const [heure,        setHeure]        = useState("")
   const [showPointer,  setShowPointer]  = useState(false)
   const [pointerHeure, setPointerHeure] = useState(null)
@@ -74,71 +87,96 @@ export default function DashboardMedecinChef() {
     specialite: user?.specialite || "Médecine générale",
   }
 
-  const handleValider = (consultId, data) => {
-    console.log("handleValider appelé avec:", { consultId, data })
-    const ts = new Date().toLocaleString("fr-FR")
-    const existing = consultations.find(c => c.id === consultId)
-    const assignedDoctorId = data.docteurId ? Number(data.docteurId) : medecinChef.id
-    const isAssignedToOtherDoctor = data.docteurId && Number(data.docteurId) !== medecinChef.id
-    console.log("isAssignedToOtherDoctor:", isAssignedToOtherDoctor, "medecinChef.id:", medecinChef.id, "data.docteurId:", data.docteurId)
+  const handleValider = async (consultId, data) => {
+    const assignedDoctorId = data.docteurId ? Number(data.docteurId) : Number(medecinChef.id)
+    const isAssignedToOtherDoctor = data.docteurId && Number(data.docteurId) !== Number(medecinChef.id)
+    const medecinAssigne = medecins.find(m => Number(m.id) === assignedDoctorId)
+    const todayStr = today()
+    const motifFile = data.plaintes?.trim() || data.diagnostic?.trim() || "Consultation d'accueil"
+    const existing = consultations.find(
+      c => c.patientId === data.patientId && c.date?.slice(0, 10) === today() && Number(c.docteurId) === assignedDoctorId
+    )
+
     const consultationPayload = {
-      id: consultId,
-      ...data,
-      docteurId: assignedDoctorId,
-      signePar: user?.nom || "Dr. Doumbouya",
-      signeLe: ts,
+      patientId:  data.patientId,
+      date:       today(),
+      service:    medecinAssigne?.specialite || medecinChef.specialite,
+      motif:      data.plaintes,
+      plaintes:   data.plaintes,
+      symptomes:  data.symptomes,
+      observations: data.observations,
+      diagnostic: data.diagnostic,
+      docteurId:  assignedDoctorId,
+      signe:      false,
+      etape:      "triage",
     }
 
-    if (existing) {
-      updateConsultation(consultId, consultationPayload)
-    } else {
-      addConsultation(consultationPayload)
+    try {
+      if (isAssignedToOtherDoctor) {
+        const anciennesChef = consultations.filter(c =>
+          Number(c.patientId) === Number(data.patientId)
+          && (c.date?.slice(0, 10) || c.date) === todayStr
+          && Number(c.docteurId) === Number(medecinChef.id)
+        )
+        for (const ac of anciennesChef) {
+          if (ac.id) await deleteConsultation(ac.id)
+        }
+      }
+      if (existing) {
+        await updateConsultation(existing.id, consultationPayload)
+      } else {
+        await addConsultation(consultationPayload)
+      }
+    } catch (e) {
+      alert(e.message || "Erreur lors de l'enregistrement du triage.")
+      return
     }
 
-    const fileId = data.fileId
-    const entree = fileId ? file.find(f => f.id === fileId) : null
-    console.log("entree trouvée:", entree)
+    const entree =
+      (data.fileId && file.find(f => f.id === data.fileId))
+      || file.find(f =>
+        Number(f.patientId) === Number(data.patientId)
+        && f.statut !== "termine"
+        && (f.dateEntree === today() || f.dateEntree == null)
+      )
 
     if (isAssignedToOtherDoctor && entree) {
-      // Mettre à jour l'entrée dans la file pour la marquer comme terminée et assignée
-      if (entree) {
-        updateFileEntry(entree.id, {
-          statut: "termine",
-          medecin_id: Number(data.docteurId),
-          docteurId: Number(data.docteurId),
-          paiementConsultation: { statut: "paye", montant: entree.montantConsultation || 0 }
-        })
-      }
+      await updateFileEntry(entree.id, {
+        statut: "en_cours",
+        medecin_id: assignedDoctorId,
+        docteurId: assignedDoctorId,
+        service: medecinAssigne?.specialite || entree.service,
+        motif: motifFile,
+      })
       const patient = sharedPatients.find(p => p.id === data.patientId)
-      addNotif({
-        docteurId:  data.docteurId,
+      await addNotif({
+        docteurId:  assignedDoctorId,
         patientNom: patient?.nom || entree?.nom || "Patient",
         motif:      data.plaintes || entree?.motif || "Consultation",
-        service:    data.service || "",
+        service:    medecinAssigne?.specialite || "",
       })
+      alert(`Patient orienté vers ${medecinAssigne?.nom || "le médecin"} — visible dans sa file de patients.`)
     } else if (!isAssignedToOtherDoctor) {
-      const patient = sharedPatients.find(p => p.id === data.patientId) ||
-                      patients.find(p => p.id === data.patientId)
-      const entreeFile = file.find(f => f.patientId === data.patientId && f.statut !== "termine")
-      setMConsultComplete({
-        patient,
-        fileId: entreeFile?.id,
-        consultationExistante: {
-          patientId: data.patientId,
-          motif:     data.plaintes,
-          plaintes:  data.plaintes,
-          service:   medecinChef.specialite,
-        }
-      })
+      if (entree) {
+        await updateFileEntry(entree.id, {
+          statut: "en_cours",
+          medecin_id: Number(medecinChef.id),
+          docteurId: Number(medecinChef.id),
+          motif: motifFile,
+        })
+      }
+      alert("Patient ajouté à « Mes consultations ». Ouvrez-le depuis cet onglet pour continuer.")
     } else {
       alert("Erreur : impossible de trouver l'entrée dans la file d'attente.")
     }
+    rafraichir?.()
   }
 
-  const handleSauvegarderComplete = (data) => {
+  const handleSauvegarderComplete = async (data) => {
     if (!mConsultComplete) return
     const { patient, fileId } = mConsultComplete
-    addConsultation({
+    try {
+    await addConsultation({
       patientId:        patient.id,
       docteurId:        medecinChef.id,
       date:             today(),
@@ -150,46 +188,61 @@ export default function DashboardMedecinChef() {
       fraisExamens:     data.fraisExamens || 0,
       examensCommandes: data.examensCommandes || [],
       typeConsultation: data.typeConsultation || "standard",
+      donneesBrouillon: buildDonneesBrouillon(data),
+      envoyerLabo:      data.envoyerLabo === true,
     })
-    if (fileId && (data.fraisExamens || 0) > 0) {
+    if (fileId && (data.examensCommandes?.length > 0)) {
       updateFileEntry(fileId, {
-        fraisExamens:    data.fraisExamens,
+        fraisExamens:    data.fraisExamens || 0,
         examensCommandes: data.examensCommandes,
         ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
       })
     }
+    await rafraichir?.()
     setMConsultComplete(null)
-    alert("Consultation sauvegardée.")
-    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch { /* ignore */ }
+    alert("Consultation sauvegardée — vos données sont conservées.")
+    } catch (e) {
+      alert(e.message || "Erreur de sauvegarde.")
+    }
   }
 
-  const handleSignerComplete = (data) => {
+  const handleSignerComplete = async (data) => {
     if (!mConsultComplete) return
-    const { patient, fileId } = mConsultComplete
+    const { patient, fileId, consultationExistante } = mConsultComplete
+    if ((data.examensCommandes?.length > 0) && !consultationExistante?.laboValide) {
+      alert("Signature impossible : résultats du laboratoire non validés.")
+      return
+    }
     const ts = new Date().toLocaleString("fr-FR")
 
-    addConsultation({
-      patientId:        patient.id,
-      docteurId:        medecinChef.id,
-      date:             today(),
-      service:          medecinChef.specialite,
-      motif:            data.motif,
-      plaintes:         data.plaintes,
-      diagnostics:      data.diagnostics || [],
-      traitements:      data.traitements || [],
-      fraisExamens:     data.fraisExamens || 0,
-      examensCommandes: data.examensCommandes || [],
-      typeConsultation: data.typeConsultation || "standard",
-      signe:            true,
-      signeLe:          ts,
-      signePar:         medecinChef.nom,
-    })
+    try {
+      const consultId = await addConsultation({
+        patientId:        patient.id,
+        docteurId:        medecinChef.id,
+        date:             today(),
+        service:          medecinChef.specialite,
+        motif:            data.motif,
+        plaintes:         data.plaintes,
+        diagnostics:      data.diagnostics || [],
+        traitements:      data.traitements || [],
+        fraisExamens:     data.fraisExamens || 0,
+        examensCommandes: data.examensCommandes || [],
+        typeConsultation: data.typeConsultation || "standard",
+        signe:            true,
+        signeLe:          ts,
+        signePar:         medecinChef.nom,
+      })
+      if (consultId) await signerConsultation(consultId, medecinChef.nom)
+    } catch (e) {
+      alert(e.message || "Erreur lors de la signature.")
+      return
+    }
 
     if (fileId) {
-      updateFileEntry(fileId, {
+      await updateFileEntry(fileId, {
         statut: "termine",
-        ...(((data.fraisExamens || 0) > 0) && {
-          fraisExamens:    data.fraisExamens,
+        ...(data.examensCommandes?.length > 0 && {
+          fraisExamens:    data.fraisExamens || 0,
           examensCommandes: data.examensCommandes,
         }),
         ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
@@ -197,11 +250,11 @@ export default function DashboardMedecinChef() {
     }
 
     setMConsultComplete(null)
-    const msg = (data.fraisExamens || 0) > 0
-      ? `Consultation signée. Frais d'examens : ${data.fraisExamens.toLocaleString("fr-FR")} GNF — orienter le patient vers la comptabilité.`
+    const nbEx = (data.examensCommandes || []).length
+    const msg = nbEx > 0
+      ? `Consultation signée. ${nbEx} examen(s) prescrit(s) — le laboratoire fixera les tarifs, puis orienter le patient vers la comptabilité.`
       : "Consultation signée et validée."
     alert(msg)
-    try { resetAppDataForTest(); alert('Données frontend vidées pour test.'); } catch { /* ignore */ }
   }
 
   const handleReprendreConsultation = (consultation) => {
@@ -238,40 +291,52 @@ export default function DashboardMedecinChef() {
     alert("Consultation sauvegardée.")
   }
 
-  const handleSignerActiveConsultation = (data) => {
+  const handleSignerActiveConsultation = async (data) => {
     if (!activeConsultation) return
     const { patient, consultation } = activeConsultation
+    if ((data.examensCommandes?.length > 0) && !consultation?.laboValide) {
+      alert("Signature impossible : résultats du laboratoire non validés.")
+      return
+    }
     const ts = new Date().toLocaleString("fr-FR")
-    addConsultation({
-      patientId:        patient.id,
-      docteurId:        medecinChef.id,
-      date:             consultation.date || today(),
-      service:          medecinChef.specialite,
-      motif:            data.motif,
-      plaintes:         data.plaintes,
-      diagnostics:      data.diagnostics || [],
-      traitements:      data.traitements || [],
-      fraisExamens:     data.fraisExamens || 0,
-      examensCommandes: data.examensCommandes || [],
-      typeConsultation: data.typeConsultation || consultation.typeConsultation || "standard",
-      signe:            true,
-      signeLe:          ts,
-      signePar:         medecinChef.nom,
-    })
+    try {
+      const consultId = await addConsultation({
+        patientId:        patient.id,
+        docteurId:        medecinChef.id,
+        date:             consultation.date || today(),
+        service:          medecinChef.specialite,
+        motif:            data.motif,
+        plaintes:         data.plaintes,
+        diagnostics:      data.diagnostics || [],
+        traitements:      data.traitements || [],
+        fraisExamens:     data.fraisExamens || 0,
+        examensCommandes: data.examensCommandes || [],
+        typeConsultation: data.typeConsultation || consultation.typeConsultation || "standard",
+        signe:            true,
+        signeLe:          ts,
+        signePar:         medecinChef.nom,
+      })
+      const idSign = consultId || consultation.id
+      if (idSign) await signerConsultation(idSign, medecinChef.nom)
+    } catch (e) {
+      alert(e.message || "Erreur lors de la signature.")
+      return
+    }
     const fileEntry = file.find(f => f.patientId === patient.id && f.statut !== "termine")
     if (fileEntry) {
-      updateFileEntry(fileEntry.id, {
+      await updateFileEntry(fileEntry.id, {
         statut: "termine",
-        ...(((data.fraisExamens || 0) > 0) && {
-          fraisExamens:    data.fraisExamens,
+        ...(data.examensCommandes?.length > 0 && {
+          fraisExamens:    data.fraisExamens || 0,
           examensCommandes: data.examensCommandes,
         }),
         ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
       })
     }
     setActiveConsultation(null)
-    const msg = (data.fraisExamens || 0) > 0
-      ? `Consultation signée. Frais d'examens : ${data.fraisExamens.toLocaleString("fr-FR")} GNF — orienter le patient vers la comptabilité.`
+    const nbEx = (data.examensCommandes || []).length
+    const msg = nbEx > 0
+      ? `Consultation signée. ${nbEx} examen(s) prescrit(s) — le laboratoire fixera les tarifs, puis orienter le patient vers la comptabilité.`
       : "Consultation signée et validée."
     alert(msg)
   }
@@ -346,7 +411,9 @@ export default function DashboardMedecinChef() {
     setTimeout(() => w.print(), 400)
   }
 
-  const enAttente = consultations.filter(c => c.date === today() && !c.signePar).length
+  const enAttente = consultations.filter(c =>
+    consultationPourMedecin(c, file, medecinChef.id, today()) && !c.signe
+  ).length
 
   const NAV_ICONS = {
     accueil: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>,
@@ -378,6 +445,9 @@ export default function DashboardMedecinChef() {
           onClose={() => setMConsultComplete(null)}
           onSauvegarder={handleSauvegarderComplete}
           onSigner={handleSignerComplete}
+          prixExamensParLabo
+          attenteResultatsLabo={mConsultComplete.consultationExistante?.attenteResultatsLabo}
+          laboValide={mConsultComplete.consultationExistante?.laboValide}
         />
       )}
       {activeConsultation && (
@@ -389,6 +459,9 @@ export default function DashboardMedecinChef() {
           onClose={() => setActiveConsultation(null)}
           onSauvegarder={handleSauvegarderActiveConsultation}
           onSigner={handleSignerActiveConsultation}
+          prixExamensParLabo
+          attenteResultatsLabo={activeConsultation.consultation?.attenteResultatsLabo}
+          laboValide={activeConsultation.consultation?.laboValide}
         />
       )}
 

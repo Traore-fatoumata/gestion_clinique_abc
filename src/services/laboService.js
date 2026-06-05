@@ -37,6 +37,11 @@ export const laboService = {
   },
 
   // ── Valider une demande ─────────────────────────────────
+  fixerTarifs: async (id, examens) => {
+    const { data } = await api.patch(`${BASE_URL}/${id}/tarifs`, { examens })
+    return data
+  },
+
   validerDemande: async (id, valide_par, resultats, commentaire_global) => {
     const { data } = await api.patch(`${BASE_URL}/${id}/valider`, {
       valide_par,

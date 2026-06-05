@@ -1,4 +1,5 @@
 const pool = require("../config/db")
+const { notifyUtilisateur } = require("../services/notificationService")
 
 // ═══════════════════════════════════════════════════════════════
 //  GET /api/labo — Liste les demandes de laboratoire
@@ -16,7 +17,7 @@ const listerDemandes = async (req, res) => {
         u.nom AS medecin_nom, u.specialite
       FROM demandes_labo dl
       JOIN patients p ON p.id = dl.patient_id
-      LEFT JOIN utilisateurs u ON u.id = dl.medecin_prescripteur
+      LEFT JOIN utilisateurs u ON u.id = dl.medecin_id
       WHERE 1=1
     `
     const params = []
@@ -49,7 +50,7 @@ const listerDemandes = async (req, res) => {
           sexe: d.sexe,
           dateNaissance: d.date_naissance
         },
-        medecinPrescripteur: d.medecin_prescripteur || d.medecin_nom || '—',
+        medecinPrescripteur: d.medecin_nom || d.medecin_prescripteur || '—',
         service: d.service,
         dateDemande: d.date_demande,
         heureDemande: d.heure_demande ? d.heure_demande.slice(0, 5) : null,
@@ -97,7 +98,7 @@ const getDemandeById = async (req, res) => {
         u.nom AS medecin_nom, u.specialite
       FROM demandes_labo dl
       JOIN patients p ON p.id = dl.patient_id
-      LEFT JOIN utilisateurs u ON u.id = dl.medecin_prescripteur
+      LEFT JOIN utilisateurs u ON u.id = dl.medecin_id
       WHERE dl.id = $1`,
       [id]
     )
@@ -124,7 +125,7 @@ const getDemandeById = async (req, res) => {
         telephone: d.telephone,
         quartier: d.quartier
       },
-      medecinPrescripteur: d.medecin_prescripteur || d.medecin_nom || '—',
+      medecinPrescripteur: d.medecin_nom || d.medecin_prescripteur || '—',
       service: d.service,
       dateDemande: d.date_demande,
       heureDemande: d.heure_demande ? d.heure_demande.slice(0, 5) : null,
@@ -331,6 +332,23 @@ const validerDemande = async (req, res) => {
         message: "Demande introuvable." 
       })
 
+    const { rows: info } = await pool.query(
+      `SELECT dl.medecin_id, dl.consultation_id, dl.patient_id, p.nom AS patient_nom
+       FROM demandes_labo dl
+       JOIN patients p ON p.id = dl.patient_id
+       WHERE dl.id=$1`,
+      [id]
+    )
+    if (info[0]?.medecin_id) {
+      await notifyUtilisateur(info[0].medecin_id, {
+        titre:       `Résultats labo disponibles — ${info[0].patient_nom}`,
+        patient_nom: info[0].patient_nom,
+        motif:       "Vous pouvez maintenant signer et valider la consultation.",
+        type_notif:  "resultats_labo",
+        patient_id:  info[0].patient_id,
+      })
+    }
+
     return res.json({ success: true, message: "Demande validée." })
   } catch (err) {
     console.error("validerDemande:", err)
@@ -362,6 +380,68 @@ const supprimerDemande = async (req, res) => {
   }
 }
 
+// PATCH /api/labo/:id/tarifs — fixer les prix (laboratoire)
+const fixerTarifs = async (req, res) => {
+  const { examens } = req.body
+  if (!examens || !Array.isArray(examens))
+    return res.status(400).json({ success: false, message: "Liste examens requise." })
+
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+
+    const { rows: demande } = await client.query(
+      "SELECT file_id, patient_id FROM demandes_labo WHERE id=$1",
+      [req.params.id]
+    )
+    if (demande.length === 0) {
+      await client.query("ROLLBACK")
+      return res.status(404).json({ success: false, message: "Demande introuvable." })
+    }
+
+    const fileId = demande[0].file_id
+
+    for (const ex of examens) {
+      if (ex.id) {
+        await client.query(
+          "UPDATE examens_labo SET prix=$1 WHERE id=$2 AND demande_id=$3",
+          [ex.prix || 0, ex.id, req.params.id]
+        )
+      }
+      if (fileId && ex.nom) {
+        await client.query(
+          `UPDATE examens_commandes SET prix=$1
+           WHERE file_id=$2 AND nom=$3`,
+          [ex.prix || 0, fileId, ex.nom]
+        )
+      }
+    }
+
+    if (fileId) {
+      const { rows: sum } = await client.query(
+        "SELECT COALESCE(SUM(prix),0) AS total FROM examens_commandes WHERE file_id=$1",
+        [fileId]
+      )
+      const total = Number(sum[0].total)
+      await client.query(
+        `INSERT INTO paiements_examens (file_id, patient_id, montant_total, montant_paye, statut)
+         VALUES ($1,$2,$3,0,'en_attente')
+         ON CONFLICT (file_id) DO UPDATE SET montant_total=$3, updated_at=NOW()`,
+        [fileId, demande[0].patient_id, total]
+      )
+    }
+
+    await client.query("COMMIT")
+    return res.json({ success: true, message: "Tarifs enregistrés. Le patient peut payer à la comptabilité." })
+  } catch (err) {
+    await client.query("ROLLBACK")
+    console.error("fixerTarifs:", err)
+    return res.status(500).json({ success: false, message: "Erreur serveur." })
+  } finally {
+    client.release()
+  }
+}
+
 module.exports = {
   listerDemandes,
   getDemandeById,
@@ -369,5 +449,6 @@ module.exports = {
   demarrerPrelevement,
   sauvegarderResultats,
   validerDemande,
-  supprimerDemande
+  supprimerDemande,
+  fixerTarifs,
 }

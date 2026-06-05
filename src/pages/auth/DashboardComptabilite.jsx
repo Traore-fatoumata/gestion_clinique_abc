@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import logo from "../../assets/images/logo.jpeg"
 import { useAuth } from "../../hooks/useAuth.jsx"
 import { useNavigate } from "react-router-dom"
@@ -123,7 +123,7 @@ function ModalPaiementExamens({ entree, onClose, onSave }) {
   const [montant, setMontant] = useState(String(restant))
   const montantNum = Math.min(parseInt(montant)||0, restant)
   const apresVers  = dejaPayé + montantNum
-  const statutFinal = apresVers >= total ? "paye" : apresVers > 0 ? "partiel" : "non_paye"
+  const statutFinal = apresVers >= total ? "paye" : apresVers > 0 ? "partiel" : "en_attente"
   const ok = montantNum > 0
 
   return (
@@ -278,13 +278,48 @@ export default function DashboardComptabilite() {
   const navigate = useNavigate()
   const handleLogout = () => { logout(); navigate("/login") }
 
-  const { patients: sharedPatients, file, updateFileEntry } = useSharedData()
+  const { patients: sharedPatients, file, updateFileEntry, apiFetch } = useSharedData()
   const { settings } = useClinicSettings()
   const [onglet, setOnglet] = useState("caisse")
   const [recherche, setRecherche] = useState("")
   const [mPmt,   setMPmt]   = useState(null)
   const [mPmtEx, setMPmtEx] = useState(null)
   const [filterStatut, setFilterStatut] = useState("tous")
+
+  const [statsBackend, setStatsBackend] = useState(null)
+  const [historiqueBackend, setHistoriqueBackend] = useState([])
+
+  const chargerStats = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/paiements/stats")
+      if (res.success) {
+        setStatsBackend(res.stats)
+      }
+    } catch (err) {
+      console.error("Erreur chargement statistiques:", err)
+    }
+  }, [apiFetch])
+
+  const chargerHistorique = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/paiements/historique")
+      if (res.success) {
+        setHistoriqueBackend(res.historique)
+      }
+    } catch (err) {
+      console.error("Erreur chargement historique:", err)
+    }
+  }, [apiFetch])
+
+  useEffect(() => {
+    chargerStats()
+  }, [chargerStats])
+
+  useEffect(() => {
+    if (onglet === "historique") {
+      chargerHistorique()
+    }
+  }, [onglet, chargerHistorique])
 
   // Enrichir les entrées avec infos patient
   const fileEnrichie = file.map(f => {
@@ -314,16 +349,22 @@ export default function DashboardComptabilite() {
         })
       }
     }
-    if ((f.fraisExamens || 0) > 0) {
+    const examensPrescrits = (f.examensCommandes || []).length > 0
+    const totalExamens = examensPrescrits
+      ? (f.examensCommandes || []).reduce((s, e) => s + (Number(e.prix) || 0), 0)
+      : (f.fraisExamens || 0)
+
+    if (examensPrescrits) {
       const montantPayeEx = f.paiementExamens?.montantPaye || 0
       const statutEx = f.paiementExamens?.statut || "en_attente"
       toutesLignes.push({
         key: f.id + "_e",
         ...f,
         typeFacture: "examens",
-        montantFacture: f.fraisExamens,
+        montantFacture: totalExamens,
+        tarifLaboEnAttente: totalExamens === 0,
         montantPayeEx,
-        restantEx: Math.max(0, (f.fraisExamens||0) - montantPayeEx),
+        restantEx: Math.max(0, totalExamens - montantPayeEx),
         paye: statutEx === "paye",
         statutLigne: statutEx === "paye" ? "paye" : statutEx === "partiel" ? "partiel" : "en_attente",
         paiementInfo: f.paiementExamens,
@@ -355,11 +396,19 @@ export default function DashboardComptabilite() {
   const handleSavePmt = (data) => {
     updateFileEntry(mPmt.id, { paiementConsultation: data })
     setMPmt(null)
+    setTimeout(() => {
+      chargerStats()
+      if (onglet === "historique") chargerHistorique()
+    }, 600)
   }
 
   const handleSaveExamen = (data) => {
     updateFileEntry(mPmtEx.id, { paiementExamens: { ...data, methode: data.methode, note: data.note, date: data.date } })
     setMPmtEx(null)
+    setTimeout(() => {
+      chargerStats()
+      if (onglet === "historique") chargerHistorique()
+    }, 600)
   }
 
   const NAV_ICONS = {
@@ -569,17 +618,20 @@ export default function DashboardComptabilite() {
                           )}
                         </td>
                         <td style={{ padding:"12px 16px" }}>
-                          <p style={{ fontSize:14, fontWeight:800, color:C.textPri }}>{fmtMoney(l.montantFacture)}</p>
-                          {l.statutLigne === "partiel" && (
+                          {l.tarifLaboEnAttente
+                            ? <p style={{ fontSize:12, fontWeight:700, color:C.amber, fontStyle:"italic" }}>Tarif labo en attente</p>
+                            : <p style={{ fontSize:14, fontWeight:800, color:C.textPri }}>{fmtMoney(l.montantFacture)}</p>
+                          }
+                          {l.statutLigne === "partiel" && !l.tarifLaboEnAttente && (
                             <p style={{ fontSize:10, color:C.amber, fontWeight:700 }}>
                               Payé : {fmtMoney(l.montantPayeEx)} · Reste : {fmtMoney(l.restantEx)}
                             </p>
                           )}
                         </td>
-                        <td style={{ padding:"12px 16px" }}><Badge statut={l.statutLigne} /></td>
+                        <td style={{ padding:"12px 16px" }}><Badge statut={l.tarifLaboEnAttente ? "en_attente" : l.statutLigne} /></td>
                         <td style={{ padding:"12px 16px" }}>
                           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                            {!l.paye && (
+                            {!l.paye && !l.tarifLaboEnAttente && (
                               <button onClick={()=>setMPmtEx(l)}
                                 style={{ padding:"6px 14px", border:"none", borderRadius:8, background:l.statutLigne==="partiel"?C.amber:C.blue, color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
                                 {l.statutLigne === "partiel" ? "Compléter" : "Encaisser"}
@@ -616,29 +668,53 @@ export default function DashboardComptabilite() {
                 </tr></thead>
                 <tbody>
                   {(() => {
-                    const payees = toutesLignes.filter(l => l.paye)
+                    const payees = historiqueBackend.length > 0 ? historiqueBackend.map(l => {
+                      const isConsult = l.paiementConsultation !== null
+                      const pmt = isConsult ? l.paiementConsultation : l.paiementExamens
+                      const m = pmt?.methode
+                      const mLabel = m==="orange_money"?"Orange Money":m==="wave"?"Wave":m==="virement"?"Virement":"Espèces"
+                      const dateFormatted = pmt?.date ? new Date(pmt.date).toLocaleDateString("fr-FR") : new Date(l.dateEntree).toLocaleDateString("fr-FR")
+                      return {
+                        key: l.fileId + "_" + (isConsult ? "c" : "e"),
+                        nom: l.patient?.nom,
+                        service: l.service,
+                        typeFacture: isConsult ? "consultation" : "examens",
+                        montantFacture: isConsult ? pmt.montant : pmt.montantPaye,
+                        methodeLabel: mLabel,
+                        date: dateFormatted
+                      }
+                    }) : toutesLignes.filter(l => l.paye).map(l => {
+                      const m = l.paiementInfo?.methode
+                      const mLabel = m==="orange_money"?"Orange Money":m==="wave"?"Wave":m==="virement"?"Virement":"Espèces"
+                      return {
+                        key: l.key,
+                        nom: l.nom,
+                        service: l.service,
+                        typeFacture: l.typeFacture,
+                        montantFacture: l.montantFacture,
+                        methodeLabel: mLabel,
+                        date: l.paiementInfo?.date||"—"
+                      }
+                    })
+
                     if (payees.length === 0) return (
                       <tr><td colSpan={6} style={{ padding:40, textAlign:"center", color:C.textMuted }}>Aucun paiement enregistré</td></tr>
                     )
-                    return payees.map((l,i,arr) => {
-                      const m = l.paiementInfo?.methode
-                      const mLabel = m==="orange_money"?"Orange Money":m==="wave"?"Wave":m==="virement"?"Virement":"Espèces"
-                      return (
-                        <tr key={l.key} style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none" }}>
-                          <td style={{ padding:"11px 16px", fontSize:13, fontWeight:600 }}>{l.nom}</td>
-                          <td style={{ padding:"11px 16px", fontSize:12, color:C.textSec }}>{l.service||"—"}</td>
-                          <td style={{ padding:"11px 16px" }}>
-                            {l.typeFacture==="consultation"
-                              ? <span style={{ fontSize:11,fontWeight:700,background:C.tealSoft,color:C.teal,padding:"2px 8px",borderRadius:10 }}>Consultation</span>
-                              : <span style={{ fontSize:11,fontWeight:700,background:C.blueSoft,color:C.blue,padding:"2px 8px",borderRadius:10 }}>Examens</span>
-                            }
-                          </td>
-                          <td style={{ padding:"11px 16px", fontSize:13, fontWeight:700, color:C.green }}>{fmtMoney(l.montantFacture)}</td>
-                          <td style={{ padding:"11px 16px", fontSize:12, color:C.textSec }}>{mLabel}</td>
-                          <td style={{ padding:"11px 16px", fontSize:12, color:C.textMuted }}>{l.paiementInfo?.date||"—"}</td>
-                        </tr>
-                      )
-                    })
+                    return payees.map((l,i,arr) => (
+                      <tr key={l.key} style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none" }}>
+                        <td style={{ padding:"11px 16px", fontSize:13, fontWeight:600 }}>{l.nom}</td>
+                        <td style={{ padding:"11px 16px", fontSize:12, color:C.textSec }}>{l.service||"—"}</td>
+                        <td style={{ padding:"11px 16px" }}>
+                          {l.typeFacture==="consultation"
+                            ? <span style={{ fontSize:11,fontWeight:700,background:C.tealSoft,color:C.teal,padding:"2px 8px",borderRadius:10 }}>Consultation</span>
+                            : <span style={{ fontSize:11,fontWeight:700,background:C.blueSoft,color:C.blue,padding:"2px 8px",borderRadius:10 }}>Examens</span>
+                          }
+                        </td>
+                        <td style={{ padding:"11px 16px", fontSize:13, fontWeight:700, color:C.green }}>{fmtMoney(l.montantFacture)}</td>
+                        <td style={{ padding:"11px 16px", fontSize:12, color:C.textSec }}>{l.methodeLabel}</td>
+                        <td style={{ padding:"11px 16px", fontSize:12, color:C.textMuted }}>{l.date}</td>
+                      </tr>
+                    ))
                   })()}
                 </tbody>
               </table>
@@ -674,13 +750,33 @@ export default function DashboardComptabilite() {
                   <p style={{ fontSize:13, color:C.textSec }}>{toutesLignes.length} lignes · {lignesPayees.length} payées · {nbAttente} en attente</p>
                 </div>
 
+                {/* Recettes Périodiques (Jour, Mois, Total) */}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:10 }}>
+                  {[
+                    { label: "Recette du Jour", val: statsBackend ? fmtMoney(statsBackend.recetteJour) : fmtMoney(totalRecettes), desc: "Aujourd'hui (Consultations + Examens)", color: C.green, bg: "#dcfce7" },
+                    { label: "Recette du Mois", val: statsBackend ? fmtMoney(statsBackend.recetteMois) : "Chargement...", desc: "Mois en cours", color: C.blue, bg: "#e8f4fb" },
+                    { label: "Recette Totale", val: statsBackend ? fmtMoney(statsBackend.recetteTotal) : "Chargement...", desc: "Depuis le début", color: C.teal, bg: "#f0fdfa" }
+                  ].map(({ label, val, desc, color, bg }) => (
+                    <div key={label} style={{ background: C.white, borderRadius: 16, padding: "20px", border: "1px solid " + C.border, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <p style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
+                        <p style={{ fontSize: 24, fontWeight: 800, color, marginTop: 6, marginBottom: 4 }}>{val}</p>
+                        <p style={{ fontSize: 11, color: C.textMuted }}>{desc}</p>
+                      </div>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", color }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 {/* KPI — 4 cartes en ligne */}
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:20 }}>
                   {[
                     { label:"Total Lignes", val:toutesLignes.length, sub:`${lignesPayees.length} payées · ${nbAttente} en attente`, kpi:0 },
-                    { label:"Recettes (GNF)", val:fmtMoney(totalRecettes), sub:`Paiements encaissés`, kpi:1 },
-                    { label:"Taux de paiement", val:tauxPaiement+"%", sub:`${fmtMoney(totalEncaisse)} encaissé`, kpi:2 },
-                    { label:"Reste à encaisser", val:fmtMoney(totalAEncaisser), sub:`Paiements en attente`, kpi:3 },
+                    { label:"Recettes du jour (en caisse)", val:fmtMoney(totalRecettes), sub:`Paiements encaissés`, kpi:1 },
+                    { label:"Taux de paiement", val:statsBackend && statsBackend.tauxRecouvrement !== undefined ? statsBackend.tauxRecouvrement+"%" : tauxPaiement+"%", sub:`${fmtMoney(statsBackend ? statsBackend.totalEncaisse : totalEncaisse)} encaissé`, kpi:2 },
+                    { label:"Reste à encaisser", val:fmtMoney(statsBackend ? statsBackend.totalAttente : totalAEncaisser), sub:`Paiements en attente`, kpi:3 },
                   ].map(({label,val,sub,kpi}) => {
                     const k = KPI_COLORS[kpi]
                     return (
@@ -688,7 +784,7 @@ export default function DashboardComptabilite() {
                         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
                           <div style={{ flex:1,minWidth:0 }}>
                             <p style={{ fontSize:12,color:C.textSec,marginBottom:8,fontWeight:500 }}>{label}</p>
-                            <p style={{ fontSize:28,fontWeight:800,color:C.textPri,lineHeight:1,marginBottom:6 }}>{val}</p>
+                            <p style={{ fontSize:24,fontWeight:800,color:C.textPri,lineHeight:1,marginBottom:6 }}>{val}</p>
                             <p style={{ fontSize:11,color:C.textMuted }}>{sub}</p>
                           </div>
                           <div style={{ width:44,height:44,borderRadius:12,background:k.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:k.fg,marginLeft:10 }}>
