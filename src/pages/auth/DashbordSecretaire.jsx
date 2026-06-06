@@ -30,10 +30,7 @@ export default function DashboardSecretaire() {
   const [dateStr,      setDateStr]      = useState("")
   const [showNouveau,  setShowNouveau]  = useState(false)
   const [showRecherche,setShowRecherche]= useState(false)
-  const [notifications,setNotifications]= useState([
-    { id:1, type:"rdv",  message:"RDV de Sow Fatoumata demain à 09h00 — Gynécologie (envoyée direct au spécialiste)", lu:false, date:today() },
-    { id:2, type:"rdv",  message:"Rappel : Baldé Aissatou a un RDV le 07/04 à 08h30", lu:false, date:today() }
-  ])
+  const [notifications,setNotifications]= useState([])
   const [showNotifs, setShowNotifs]=useState(false)
   const [recherchePatients, setRecherchePatients]=useState("")
   const [permissionModal, setPermissionModal] = useState(null) // { medecin, type: null }

@@ -15,12 +15,21 @@ export function estEnAttenteAccueil(entree, consultations = []) {
 
 /** Consultation visible dans « Mes consultations » du médecin chef */
 export function consultationPourMedecin(c, file, medecinId, todayStr) {
+  // Si la consultation n'est pas assignée à ce médecin, elle n'est pas visible
   if (Number(c.docteurId) !== Number(medecinId)) return false
+  
+  // Si la consultation est signée, elle est toujours visible pour le médecin qui l'a signée
+  if (c.signe === true) return true
+  
+  // Pour les consultations non signées, vérifier si le patient a été réassigné à un autre médecin
   const f = (file || []).find(x =>
     Number(x.patientId) === Number(c.patientId)
     && (x.dateEntree?.slice?.(0, 10) || x.dateEntree) === todayStr
   )
+  
+  // Si le patient a été réassigné à un autre médecin dans la file, la consultation n'est plus visible
   if (f && Number(f.docteurId) > 0 && Number(f.docteurId) !== Number(medecinId)) return false
+  
   return true
 }
 

@@ -65,7 +65,7 @@ function ModalPaiementConsultation({ entree, patient, onClose, onSave }) {
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}
       onClick={e=>{ if(e.target===e.currentTarget) onClose() }}>
-      <div style={{ background:C.white,borderRadius:20,width:"100%",maxWidth:480,boxShadow:"0 25px 60px rgba(0,0,0,0.2)",overflow:"hidden" }}>
+      <div style={{ background:C.white,borderRadius:20,width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 25px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ padding:"20px 24px",background:"linear-gradient(135deg,#0f4c2a,#16a34a)",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <div>
             <p style={{ fontSize:16,fontWeight:800,color:"#fff" }}>Frais de consultation — {entree.nom}</p>
@@ -129,7 +129,7 @@ function ModalPaiementExamens({ entree, onClose, onSave }) {
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}
       onClick={e=>{ if(e.target===e.currentTarget) onClose() }}>
-      <div style={{ background:C.white,borderRadius:20,width:"100%",maxWidth:520,boxShadow:"0 25px 60px rgba(0,0,0,0.2)",overflow:"hidden" }}>
+      <div style={{ background:C.white,borderRadius:20,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 25px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ padding:"20px 24px",background:"linear-gradient(135deg,#1e3a5f,#1d6fa4)",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <div>
             <p style={{ fontSize:16,fontWeight:800,color:"#fff" }}>Frais d'examens — {entree.nom}</p>

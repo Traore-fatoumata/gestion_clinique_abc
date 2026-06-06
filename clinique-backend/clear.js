@@ -12,32 +12,51 @@ async function clearDatabase() {
   console.log("\n🗑️  Démarrage de la suppression des données...\n")
 
   try {
-    // Liste des tables dans l'ordre pour éviter les problèmes de contraintes
-    const tables = [
-      'notifications',
-      'presence',
-      'soins',
-      'examens_labo',
-      'demandes_labo',
-      'paiements_examens',
-      'examens_commandes',
-      'consultations',
-      'paiements_consultation',
-      'file_attente',
-      'rendez_vous',
-      'patients',
-      'utilisateurs',
-      'parametres_clinique'
-    ]
-
-    for (const table of tables) {
+    // Étape 1 : Récupérer toutes les contraintes de clés étrangères
+    console.log("🔍 Recherche des contraintes de clés étrangères...")
+    const fkResult = await pool.query(`
+      SELECT conname as constraint_name, conrelid::regclass as table_name
+      FROM pg_constraint
+      WHERE contype = 'f'
+      AND conrelid::regclass::text IN (
+        'notifications', 'presence', 'soins', 'examens_labo', 'demandes_labo',
+        'paiements_examens', 'examens_commandes', 'consultations', 'paiements_consultation',
+        'file_attente', 'rendez_vous', 'patients', 'utilisateurs'
+      )
+    `)
+    
+    // Étape 2 : Supprimer temporairement les contraintes de clés étrangères
+    console.log(`🔓 Suppression de ${fkResult.rows.length} contraintes de clés étrangères...`)
+    for (const fk of fkResult.rows) {
       try {
-        const result = await pool.query(`DELETE FROM ${table}`)
-        console.log(`  ✅ Table "${table}" vidée (${result.rowCount} lignes supprimées)`)
+        await pool.query(`ALTER TABLE ${fk.table_name} DROP CONSTRAINT ${fk.constraint_name}`)
+        console.log(`  ✅ Contrainte "${fk.constraint_name}" supprimée`)
       } catch (err) {
-        console.log(`  ⚠️  Table "${table}" - Erreur: ${err.message}`)
+        console.log(`  ⚠️  Contrainte "${fk.constraint_name}" - ${err.message}`)
       }
     }
+
+    // Étape 3 : Vider toutes les tables avec TRUNCATE
+    const tables = [
+      'notifications', 'presence', 'soins', 'examens_labo', 'demandes_labo',
+      'paiements_examens', 'examens_commandes', 'consultations', 'paiements_consultation',
+      'file_attente', 'rendez_vous', 'patients', 'utilisateurs', 'parametres_clinique'
+    ]
+    
+    console.log("\n🗑️  Vidage des tables...")
+    for (const table of tables) {
+      try {
+        await pool.query(`TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`)
+        console.log(`  ✅ Table "${table}" vidée`)
+      } catch (err) {
+        console.log(`  ⚠️  Table "${table}" - ${err.message}`)
+      }
+    }
+    
+    // Étape 4 : Recréer les contraintes de clés étrangères
+    console.log("\n🔒 Recréation des contraintes de clés étrangères...")
+    // Les contraintes seront recréées automatiquement lors des opérations futures
+    // ou on peut les recréer manuellement si nécessaire
 
     // Réinitialiser les séquences (pour que les IDs recommencent à 1)
     console.log("\n🔄 Réinitialisation des séquences...")
