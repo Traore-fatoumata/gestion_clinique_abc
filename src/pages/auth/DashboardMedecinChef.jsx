@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import logo from "../../assets/images/logo.jpeg"
 import SettingsModal from "../../components/SettingsModal"
 import { useClinicSettings } from "../../hooks/useClinicSettings.jsx"
@@ -13,6 +13,7 @@ import PageComptes       from "./medecinChef/PageComptes.jsx"
 import PagePresence      from "./medecinChef/PagePresence.jsx"
 import PageHistorique    from "./medecinChef/PageHistorique.jsx"
 import ModalConsultation from "./medecinChef/ModalConsultation.jsx"
+import ModalCreerRdvMedecin from "./medecin/ModalCreerRdvMedecin.jsx"
 import { buildDonneesBrouillon, consultationPourMedecin } from "../../utils/clinicFlow.js"
 
 export default function DashboardMedecinChef() {
@@ -23,15 +24,31 @@ export default function DashboardMedecinChef() {
   const {
     patients: sharedPatients, consultations: sharedConsultations,
     addConsultation, updateConsultation, deleteConsultation, signerConsultation, file, updateFileEntry,
-    addNotif, resultatsLabo, soins, rdv, rafraichir
+    addNotif, resultatsLabo, soins, rdv, addRdv, rafraichir, apiFetch
   } = useSharedData()
-
+  
   const [page,         setPage]         = useState("accueil")
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
   const consultations = sharedConsultations
   const patients      = sharedPatients
   const [comptes,      setComptes]      = useState(INIT_COMPTES)
   const [medecins,     setMedecins]     = useState(INIT_MEDECINS)
+  const [statsBackend, setStatsBackend] = useState(null)
+
+  const chargerStats = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/paiements/stats")
+      if (res.success) {
+        setStatsBackend(res.stats)
+      }
+    } catch (err) {
+      console.error("Erreur chargement statistiques:", err)
+    }
+  }, [apiFetch])
+
+  useEffect(() => {
+    chargerStats()
+  }, [chargerStats, file])
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
   useEffect(() => {
@@ -44,13 +61,13 @@ export default function DashboardMedecinChef() {
       .then(res => { if (res.success && res.medecins?.length) setMedecins(res.medecins) })
       .catch(() => {})
   }, [API_URL])
+
   const [heure,        setHeure]        = useState("")
   const [showPointer,  setShowPointer]  = useState(false)
   const [pointerHeure, setPointerHeure] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showMonProfil, setShowMonProfil] = useState(false)
 
-  // ── État pour le modal Mon Profil ──
   const [profilForm, setProfilForm] = useState({
     nom: user?.nom || "",
     email: user?.email || "",
@@ -70,9 +87,9 @@ export default function DashboardMedecinChef() {
     setShowMonProfil(false)
   }
 
-  // ── Modal consultation complète (2ème étape quand chef garde le patient) ──
   const [mConsultComplete, setMConsultComplete] = useState(null)
   const [activeConsultation, setActiveConsultation] = useState(null)
+  const [showCreerRdv, setShowCreerRdv] = useState(false)
 
   useClinicSettings()
 
@@ -87,46 +104,47 @@ export default function DashboardMedecinChef() {
     specialite: user?.specialite || "Médecine générale",
   }
 
+  // ── CORRECTION BUG 2 : handleValider — suppression des doublons avant ajout ──
   const handleValider = async (consultId, data) => {
     const assignedDoctorId = data.docteurId ? Number(data.docteurId) : Number(medecinChef.id)
     const isAssignedToOtherDoctor = data.docteurId && Number(data.docteurId) !== Number(medecinChef.id)
     const medecinAssigne = medecins.find(m => Number(m.id) === assignedDoctorId)
     const todayStr = today()
     const motifFile = data.plaintes?.trim() || data.diagnostic?.trim() || "Consultation d'accueil"
-    const existing = consultations.find(
-      c => c.patientId === data.patientId && c.date?.slice(0, 10) === today() && Number(c.docteurId) === assignedDoctorId
-    )
-
-    const consultationPayload = {
-      patientId:  data.patientId,
-      date:       today(),
-      service:    medecinAssigne?.specialite || medecinChef.specialite,
-      motif:      data.plaintes,
-      plaintes:   data.plaintes,
-      symptomes:  data.symptomes,
-      observations: data.observations,
-      diagnostic: data.diagnostic,
-      docteurId:  assignedDoctorId,
-      signe:      false,
-      etape:      "triage",
-    }
 
     try {
-      if (isAssignedToOtherDoctor) {
-        const anciennesChef = consultations.filter(c =>
-          Number(c.patientId) === Number(data.patientId)
-          && (c.date?.slice(0, 10) || c.date) === todayStr
-          && Number(c.docteurId) === Number(medecinChef.id)
-        )
-        for (const ac of anciennesChef) {
-          if (ac.id) await deleteConsultation(ac.id)
-        }
+      // Supprimer les consultations non signées existantes pour ce patient aujourd'hui
+      // pour éviter les doublons
+      const anciennesASupprimer = consultations.filter(c =>
+        Number(c.patientId) === Number(data.patientId)
+        && (c.date?.slice(0, 10) || c.date) === todayStr
+        && Number(c.docteurId) === Number(medecinChef.id)
+        && !c.signe
+      )
+      for (const ac of anciennesASupprimer) {
+        if (ac.id) await deleteConsultation(ac.id)
       }
-      if (existing) {
-        await updateConsultation(existing.id, consultationPayload)
-      } else {
+
+      // Si le médecin chef garde le patient, créer une consultation de triage
+      // Si le patient est assigné à un autre médecin, NE PAS créer de consultation
+      // (le spécialiste créera sa propre consultation lorsqu'il verra le patient)
+      if (!isAssignedToOtherDoctor) {
+        const consultationPayload = {
+          patientId:    data.patientId,
+          date:         todayStr,
+          service:      medecinChef.specialite,
+          motif:        data.plaintes,
+          plaintes:     data.plaintes,
+          symptomes:    data.symptomes,
+          observations: data.observations,
+          diagnostic:   data.diagnostic,
+          docteurId:    assignedDoctorId,
+          signe:        false,
+          etape:        "triage",
+        }
         await addConsultation(consultationPayload)
       }
+
     } catch (e) {
       alert(e.message || "Erreur lors de l'enregistrement du triage.")
       return
@@ -137,16 +155,16 @@ export default function DashboardMedecinChef() {
       || file.find(f =>
         Number(f.patientId) === Number(data.patientId)
         && f.statut !== "termine"
-        && (f.dateEntree === today() || f.dateEntree == null)
+        && (f.dateEntree === todayStr || f.dateEntree == null)
       )
 
     if (isAssignedToOtherDoctor && entree) {
       await updateFileEntry(entree.id, {
-        statut: "en_cours",
+        statut:     "en_cours",
         medecin_id: assignedDoctorId,
-        docteurId: assignedDoctorId,
-        service: medecinAssigne?.specialite || entree.service,
-        motif: motifFile,
+        docteurId:  assignedDoctorId,
+        service:    medecinAssigne?.specialite || entree.service,
+        motif:      motifFile,
       })
       const patient = sharedPatients.find(p => p.id === data.patientId)
       await addNotif({
@@ -159,10 +177,10 @@ export default function DashboardMedecinChef() {
     } else if (!isAssignedToOtherDoctor) {
       if (entree) {
         await updateFileEntry(entree.id, {
-          statut: "en_cours",
+          statut:     "en_cours",
           medecin_id: Number(medecinChef.id),
-          docteurId: Number(medecinChef.id),
-          motif: motifFile,
+          docteurId:  Number(medecinChef.id),
+          motif:      motifFile,
         })
       }
       alert("Patient ajouté à « Mes consultations ». Ouvrez-le depuis cet onglet pour continuer.")
@@ -175,32 +193,45 @@ export default function DashboardMedecinChef() {
   const handleSauvegarderComplete = async (data) => {
     if (!mConsultComplete) return
     const { patient, fileId } = mConsultComplete
+    const todayStr = today()
     try {
-    await addConsultation({
-      patientId:        patient.id,
-      docteurId:        medecinChef.id,
-      date:             today(),
-      service:          medecinChef.specialite,
-      motif:            data.motif,
-      plaintes:         data.plaintes,
-      diagnostics:      data.diagnostics || [],
-      traitements:      data.traitements || [],
-      fraisExamens:     data.fraisExamens || 0,
-      examensCommandes: data.examensCommandes || [],
-      typeConsultation: data.typeConsultation || "standard",
-      donneesBrouillon: buildDonneesBrouillon(data),
-      envoyerLabo:      data.envoyerLabo === true,
-    })
-    if (fileId && (data.examensCommandes?.length > 0)) {
-      updateFileEntry(fileId, {
-        fraisExamens:    data.fraisExamens || 0,
-        examensCommandes: data.examensCommandes,
-        ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
+      // Supprimer les consultations non signées existantes pour ce patient aujourd'hui
+      // pour éviter les doublons (triage + consultation complète)
+      const anciennesASupprimer = consultations.filter(c =>
+        Number(c.patientId) === Number(patient.id)
+        && (c.date?.slice(0, 10) || c.date) === todayStr
+        && Number(c.docteurId) === Number(medecinChef.id)
+        && !c.signe
+      )
+      for (const ac of anciennesASupprimer) {
+        if (ac.id) await deleteConsultation(ac.id)
+      }
+
+      await addConsultation({
+        patientId:        patient.id,
+        docteurId:        medecinChef.id,
+        date:             todayStr,
+        service:          medecinChef.specialite,
+        motif:            data.motif,
+        plaintes:         data.plaintes,
+        diagnostics:      data.diagnostics || [],
+        traitements:      data.traitements || [],
+        fraisExamens:     data.fraisExamens || 0,
+        examensCommandes: data.examensCommandes || [],
+        typeConsultation: data.typeConsultation || "standard",
+        donneesBrouillon: buildDonneesBrouillon(data),
+        envoyerLabo:      data.envoyerLabo === true,
       })
-    }
-    await rafraichir?.()
-    setMConsultComplete(null)
-    alert("Consultation sauvegardée — vos données sont conservées.")
+      if (fileId && (data.examensCommandes?.length > 0)) {
+        updateFileEntry(fileId, {
+          fraisExamens:     data.fraisExamens || 0,
+          examensCommandes: data.examensCommandes,
+          ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
+        })
+      }
+      await rafraichir?.()
+      setMConsultComplete(null)
+      alert("Consultation sauvegardée — vos données sont conservées.")
     } catch (e) {
       alert(e.message || "Erreur de sauvegarde.")
     }
@@ -209,6 +240,7 @@ export default function DashboardMedecinChef() {
   const handleSignerComplete = async (data) => {
     if (!mConsultComplete) return
     const { patient, fileId, consultationExistante } = mConsultComplete
+    const todayStr = today()
     if ((data.examensCommandes?.length > 0) && !consultationExistante?.laboValide) {
       alert("Signature impossible : résultats du laboratoire non validés.")
       return
@@ -216,10 +248,22 @@ export default function DashboardMedecinChef() {
     const ts = new Date().toLocaleString("fr-FR")
 
     try {
+      // Supprimer les consultations non signées existantes pour ce patient aujourd'hui
+      // pour éviter les doublons (triage + consultation complète signée)
+      const anciennesASupprimer = consultations.filter(c =>
+        Number(c.patientId) === Number(patient.id)
+        && (c.date?.slice(0, 10) || c.date) === todayStr
+        && Number(c.docteurId) === Number(medecinChef.id)
+        && !c.signe
+      )
+      for (const ac of anciennesASupprimer) {
+        if (ac.id) await deleteConsultation(ac.id)
+      }
+
       const consultId = await addConsultation({
         patientId:        patient.id,
         docteurId:        medecinChef.id,
-        date:             today(),
+        date:             todayStr,
         service:          medecinChef.specialite,
         motif:            data.motif,
         plaintes:         data.plaintes,
@@ -242,7 +286,7 @@ export default function DashboardMedecinChef() {
       await updateFileEntry(fileId, {
         statut: "termine",
         ...(data.examensCommandes?.length > 0 && {
-          fraisExamens:    data.fraisExamens || 0,
+          fraisExamens:     data.fraisExamens || 0,
           examensCommandes: data.examensCommandes,
         }),
         ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
@@ -263,47 +307,79 @@ export default function DashboardMedecinChef() {
     setActiveConsultation({ patient, consultation })
   }
 
-  const handleSauvegarderActiveConsultation = (data) => {
+  const handleSauvegarderActiveConsultation = async (data) => {
     if (!activeConsultation) return
     const { patient, consultation } = activeConsultation
-    addConsultation({
-      patientId:        patient.id,
-      docteurId:        medecinChef.id,
-      date:             consultation.date || today(),
-      service:          medecinChef.specialite,
-      motif:            data.motif,
-      plaintes:         data.plaintes,
-      diagnostics:      data.diagnostics || [],
-      traitements:      data.traitements || [],
-      fraisExamens:     data.fraisExamens || 0,
-      examensCommandes: data.examensCommandes || [],
-      typeConsultation: data.typeConsultation || consultation.typeConsultation || "standard",
-    })
-    const fileEntry = file.find(f => f.patientId === patient.id && f.statut !== "termine")
-    if (fileEntry && (data.fraisExamens || 0) > 0) {
-      updateFileEntry(fileEntry.id, {
-        fraisExamens:    data.fraisExamens,
-        examensCommandes: data.examensCommandes,
-        ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
+    const todayStr = consultation.date || today()
+    try {
+      // Supprimer les consultations non signées existantes pour ce patient aujourd'hui
+      // pour éviter les doublons
+      const anciennesASupprimer = consultations.filter(c =>
+        Number(c.patientId) === Number(patient.id)
+        && (c.date?.slice(0, 10) || c.date) === (todayStr.slice?.(0, 10) || todayStr)
+        && Number(c.docteurId) === Number(medecinChef.id)
+        && !c.signe
+        && c.id !== consultation.id
+      )
+      for (const ac of anciennesASupprimer) {
+        if (ac.id) await deleteConsultation(ac.id)
+      }
+
+      addConsultation({
+        patientId:        patient.id,
+        docteurId:        medecinChef.id,
+        date:             todayStr,
+        service:          medecinChef.specialite,
+        motif:            data.motif,
+        plaintes:         data.plaintes,
+        diagnostics:      data.diagnostics || [],
+        traitements:      data.traitements || [],
+        fraisExamens:     data.fraisExamens || 0,
+        examensCommandes: data.examensCommandes || [],
+        typeConsultation: data.typeConsultation || consultation.typeConsultation || "standard",
       })
+      const fileEntry = file.find(f => f.patientId === patient.id && f.statut !== "termine")
+      if (fileEntry && (data.fraisExamens || 0) > 0) {
+        updateFileEntry(fileEntry.id, {
+          fraisExamens:     data.fraisExamens,
+          examensCommandes: data.examensCommandes,
+          ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
+        })
+      }
+      setActiveConsultation(null)
+      alert("Consultation sauvegardée.")
+    } catch (e) {
+      alert(e.message || "Erreur de sauvegarde.")
     }
-    setActiveConsultation(null)
-    alert("Consultation sauvegardée.")
   }
 
   const handleSignerActiveConsultation = async (data) => {
     if (!activeConsultation) return
     const { patient, consultation } = activeConsultation
+    const todayStr = consultation.date || today()
     if ((data.examensCommandes?.length > 0) && !consultation?.laboValide) {
       alert("Signature impossible : résultats du laboratoire non validés.")
       return
     }
     const ts = new Date().toLocaleString("fr-FR")
     try {
+      // Supprimer les consultations non signées existantes pour ce patient aujourd'hui
+      // pour éviter les doublons
+      const anciennesASupprimer = consultations.filter(c =>
+        Number(c.patientId) === Number(patient.id)
+        && (c.date?.slice(0, 10) || c.date) === (todayStr.slice?.(0, 10) || todayStr)
+        && Number(c.docteurId) === Number(medecinChef.id)
+        && !c.signe
+        && c.id !== consultation.id
+      )
+      for (const ac of anciennesASupprimer) {
+        if (ac.id) await deleteConsultation(ac.id)
+      }
+
       const consultId = await addConsultation({
         patientId:        patient.id,
         docteurId:        medecinChef.id,
-        date:             consultation.date || today(),
+        date:             todayStr,
         service:          medecinChef.specialite,
         motif:            data.motif,
         plaintes:         data.plaintes,
@@ -327,7 +403,7 @@ export default function DashboardMedecinChef() {
       await updateFileEntry(fileEntry.id, {
         statut: "termine",
         ...(data.examensCommandes?.length > 0 && {
-          fraisExamens:    data.fraisExamens || 0,
+          fraisExamens:     data.fraisExamens || 0,
           examensCommandes: data.examensCommandes,
         }),
         ...(data.montantConsultation !== undefined && { montantConsultation: Number(data.montantConsultation || 0) }),
@@ -345,6 +421,20 @@ export default function DashboardMedecinChef() {
     updateConsultation(consultId, data)
   }
 
+  const handleCreerRdv = (form) => {
+    const p = sharedPatients.find(pt => pt.id === parseInt(form.patientId))
+    addRdv({ 
+      ...form, 
+      patientId: parseInt(form.patientId), 
+      patient: p?.nom || "—", 
+      docteurId: medecinChef.id, 
+      docteur: medecinChef.nom, 
+      service: medecinChef.specialite, 
+      rappelEnvoye: false 
+    })
+    setShowCreerRdv(false)
+  }
+
   const imprimerOrdonnance = (consultation) => {
     const patient = patients.find(p => p.id === consultation.patientId)
     if (!patient) return
@@ -352,61 +442,112 @@ export default function DashboardMedecinChef() {
     const traitement = (consultation.traitements || []).join(", ") || "—"
     const diagnostic = (consultation.diagnostics || []).join(", ") || "—"
     const age = patient.date_naissance ? new Date().getFullYear() - new Date(patient.date_naissance).getFullYear() : "?"
+    const poidsStr = consultation.poids ? `${consultation.poids} kg` : "—"
+    const tailleStr = consultation.taille ? `${consultation.taille} cm` : "—"
+    const taStr = consultation.ta || "—"
+    const dateNaissStr = patient.date_naissance ? new Date(patient.date_naissance).toLocaleDateString("fr-FR") : "—"
+    const sexeStr = patient.sexe === "F" ? "Féminin" : patient.sexe === "M" ? "Masculin" : "—"
+    const antecedentsStr = consultation.antecedents || "—"
 
-    const w = window.open("", "_blank", "width=700,height=900")
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ordonnance</title><style>
-      *{box-sizing:border-box}
-      body{font-family:'Segoe UI',sans-serif;margin:0;padding:36px 40px;color:#000;font-size:13px}
-      .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #16a34a;padding-bottom:14px;margin-bottom:20px}
-      .hclinic{flex:1}
-      .title{font-size:20px;font-weight:800;color:#16a34a;margin:0 0 3px}
-      .sub{font-size:11px;color:#555;margin:2px 0}
-      .hdate{text-align:right;font-size:12px;color:#333}
-      .hdate strong{font-size:14px;display:block;margin-bottom:2px}
-      .ord-title{font-size:17px;font-weight:800;text-align:center;letter-spacing:.04em;margin:0 0 18px;text-transform:uppercase;color:#111}
-      .patient-box{border:1.5px solid #16a34a33;border-radius:8px;overflow:hidden;margin-bottom:20px}
-      .patient-box-header{background:#f0faf4;padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#16a34a;border-bottom:1px solid #16a34a22}
-      .patient-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
-      .pi-item{padding:10px 14px;border-right:1px solid #e5e7eb}
-      .pi-item:last-child{border-right:none}
-      .pi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:3px}
-      .pi-value{font-size:14px;font-weight:700;color:#111}
-      .section{margin-bottom:16px}
-      .sec-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e5e7eb}
-      .sec-value{font-size:13px;padding:9px 12px;background:#fafafa;border-radius:6px;border:1px solid #e5e7eb;line-height:1.6}
-      .rx{font-size:28px;font-weight:900;color:#16a34a;margin:0 0 6px;line-height:1}
-      .footer{margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#888;border-top:1px solid #e5e7eb;padding-top:14px}
-      .sign-box{text-align:center;border-top:1.5px solid #111;padding-top:6px;width:200px;font-size:11px;color:#333}
-      @media print{body{padding:20px 24px}}
-    </style></head><body>
-    <div class="header">
-      <div class="hclinic">
-        <div class="title">Clinique Médicale ABC Marouane</div>
-        <div class="sub">Tannerie, Kaloum · Conakry, République de Guinée</div>
-        <div class="sub">Tél : +224 624 00 00 00</div>
-        <div class="sub">Service : ${medecinChef.specialite}</div>
-      </div>
-      <div class="hdate">
-        <strong>Date</strong>
-        ${date}
-      </div>
+    const w = window.open("", "_blank", "width=720,height=960")
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Ordonnance — ${patient?.nom||""}</title><style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;margin:0;padding:36px 40px;color:#000;font-size:13px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #16a34a;padding-bottom:14px;margin-bottom:20px}
+.hclinic{flex:1}.title{font-size:20px;font-weight:800;color:#16a34a;margin:0 0 3px}
+.sub{font-size:11px;color:#555;margin:2px 0}
+.hdate{text-align:right;font-size:12px;color:#333}
+.hdate strong{font-size:14px;display:block;margin-bottom:2px}
+.ord-title{font-size:17px;font-weight:800;text-align:center;letter-spacing:.04em;margin:0 0 18px;text-transform:uppercase;color:#111}
+.patient-box{border:1.5px solid #16a34a33;border-radius:8px;overflow:hidden;margin-bottom:20px}
+.patient-box-header{background:#f0faf4;padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#16a34a;border-bottom:1px solid #16a34a22}
+.patient-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.patient-grid-2{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.pi-item{padding:10px 14px;border-right:1px solid #e5e7eb}
+.pi-item:last-child{border-right:none}
+.pi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:3px}
+.pi-value{font-size:13px;font-weight:700;color:#111}
+.section{margin-bottom:16px}
+.sec-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e5e7eb}
+.sec-value{font-size:13px;padding:9px 12px;background:#fafafa;border-radius:6px;border:1px solid #e5e7eb;line-height:1.6}
+.rx{font-size:28px;font-weight:900;color:#16a34a;margin:0 0 6px;line-height:1}
+.footer{margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#888;border-top:1px solid #e5e7eb;padding-top:14px}
+.sign-box{text-align:center;border-top:1.5px solid #111;padding-top:6px;width:220px;font-size:11px;color:#333}
+.medecin-info{font-size:12px;color:#333;font-weight:600;margin-bottom:2px}
+@media print{body{padding:20px 24px}}
+</style></head><body>
+<div class="header">
+  <div class="hclinic">
+    <div class="title">Clinique Médicale ABC Marouane</div>
+    <div class="sub">Tannerie, Kaloum · Conakry, République de Guinée</div>
+    <div class="sub">Tél : +224 624 00 00 00</div>
+    <div class="sub">Service : ${medecinChef.specialite}</div>
+  </div>
+  <div class="hdate"><strong>Date</strong>${date}</div>
+</div>
+<div class="ord-title">Ordonnance Médicale</div>
+<div class="patient-box">
+  <div class="patient-box-header">Informations du patient</div>
+  <div class="patient-grid">
+    <div class="pi-item">
+      <div class="pi-label">Nom & Prénom</div>
+      <div class="pi-value">${patient?.sexe==="F"?"Mme":"M."} ${patient?.nom||"—"}</div>
     </div>
-    <div class="ord-title">Ordonnance Médicale</div>
-    <div class="patient-box">
-      <div class="patient-box-header">Informations du patient</div>
-      <div class="patient-grid">
-        <div class="pi-item"><div class="pi-label">Nom & Prénom</div><div class="pi-value">${patient.sexe==="F"?"Mme":"M."} ${patient.nom}</div></div>
-        <div class="pi-item"><div class="pi-label">Âge</div><div class="pi-value">${age} ans</div></div>
-        <div class="pi-item"><div class="pi-label">ID Patient</div><div class="pi-value">${patient.pid}</div></div>
-      </div>
+    <div class="pi-item">
+      <div class="pi-label">Date de naissance</div>
+      <div class="pi-value">${dateNaissStr}</div>
     </div>
-    <div class="rx">℞</div>
-    <div class="section"><div class="sec-label">Diagnostic</div><div class="sec-value">${diagnostic}</div></div>
-    <div class="section"><div class="sec-label">Prescriptions</div><div class="sec-value">${traitement.split(",").map((t,i)=>`<div style="margin-bottom:6px"><strong>${i+1}.</strong> ${t.trim()}</div>`).join("")}</div></div>
-    <div class="footer">
-      <div>Valable 3 mois à compter du ${date}</div>
-      <div class="sign-box">Signature & Cachet du médecin<br/>${medecinChef.nom}</div>
-    </div></body></html>`)
+    <div class="pi-item">
+      <div class="pi-label">Âge</div>
+      <div class="pi-value">${age} ans</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Sexe</div>
+      <div class="pi-value">${sexeStr}</div>
+    </div>
+  </div>
+  <div class="patient-grid-2" style="border-top:1px solid #e5e7eb">
+    <div class="pi-item">
+      <div class="pi-label">Poids</div>
+      <div class="pi-value">${poidsStr}</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Taille</div>
+      <div class="pi-value">${tailleStr}</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Tension artérielle</div>
+      <div class="pi-value">${taStr}</div>
+    </div>
+  </div>
+  ${antecedentsStr !== "—" ? `
+  <div style="padding:8px 14px;border-top:1px solid #e5e7eb;background:#fffbf0">
+    <div class="pi-label" style="margin-bottom:3px">Antécédents médicaux</div>
+    <div style="font-size:12px;color:#333">${antecedentsStr}</div>
+  </div>` : ""}
+</div>
+<div class="rx">℞</div>
+<div class="section">
+  <div class="sec-label">Diagnostic</div>
+  <div class="sec-value">${diagnostic}</div>
+</div>
+<div class="section">
+  <div class="sec-label">Prescriptions</div>
+  <div class="sec-value">
+    ${traitement.split(",").map((t,i)=>
+      `<div style="margin-bottom:6px"><strong>${i+1}.</strong> ${t.trim()}</div>`
+    ).join("")}
+  </div>
+</div>
+<div class="footer">
+  <div>Valable 3 mois à compter du ${date}</div>
+  <div class="sign-box">
+    <div class="medecin-info">Dr. ${medecinChef.nom}</div>
+    <div class="medecin-info" style="font-weight:400;font-size:11px">${medecinChef.specialite}</div>
+    <div style="margin-top:28px">Signature & Cachet du médecin</div>
+  </div>
+</div></body></html>`)
     w.document.close()
     setTimeout(() => w.print(), 400)
   }
@@ -425,11 +566,12 @@ export default function DashboardMedecinChef() {
   }
 
   const NAV = [
-    { id: "accueil",       label: "Tableau de bord",   icon: "accueil" },
-    { id: "consultations", label: "Consultations",      icon: "liste",   badge: enAttente },
-    { id: "comptes",       label: "Gestion Personnel",  icon: "patient" },
-    { id: "presence",      label: "Suivi Présence",     icon: "clock" },
-    { id: "stats",         label: "Statistiques",       icon: "stats" },
+    { id: "accueil",       label: "Tableau de bord",    icon: "accueil" },
+    { id: "consultations", label: "Consultations",       icon: "liste",   badge: enAttente },
+    { id: "rdv",           label: "Rendez-vous",         icon: "clock" },
+    { id: "comptes",       label: "Gestion Personnel",   icon: "patient" },
+    { id: "presence",      label: "Suivi Présence",      icon: "clock" },
+    { id: "stats",         label: "Statistiques",        icon: "stats" },
     { id: "historique",    label: "Historique Patients", icon: "history" },
   ]
 
@@ -465,6 +607,16 @@ export default function DashboardMedecinChef() {
         />
       )}
 
+      {/* Modal Créer RDV */}
+      {showCreerRdv && (
+        <ModalCreerRdvMedecin
+          patients={sharedPatients}
+          medecin={medecinChef}
+          onClose={() => setShowCreerRdv(false)}
+          onCreate={handleCreerRdv}
+        />
+      )}
+
       {/* Modal Mon Profil */}
       {showMonProfil && (
         <Overlay onClose={() => setShowMonProfil(false)}>
@@ -477,7 +629,6 @@ export default function DashboardMedecinChef() {
               <FInput label="Nom complet" req><Inp value={profilForm.nom} onChange={e => pf("nom", e.target.value)} placeholder="Ex : Dr. Doumbouya" /></FInput>
               <FInput label="Email" req><Inp type="email" value={profilForm.email} onChange={e => pf("email", e.target.value)} placeholder="email@cab.gn" /></FInput>
               <FInput label="Téléphone"><Inp value={profilForm.telephone} onChange={e => pf("telephone", e.target.value)} placeholder="+224 6XX XX XX XX" /></FInput>
-              
               <div style={{ marginTop: 8 }}>
                 <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri, marginBottom: 12 }}>Changer le mot de passe</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -489,7 +640,6 @@ export default function DashboardMedecinChef() {
                   )}
                 </div>
               </div>
-
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8, borderTop: "1px solid " + C.border }}>
                 <Btn onClick={() => setShowMonProfil(false)} variant="secondary">Annuler</Btn>
                 <Btn onClick={handleSaveProfil} disabled={!profilOk || !motDePasseOk}>Enregistrer</Btn>
@@ -607,12 +757,32 @@ export default function DashboardMedecinChef() {
       )}
 
       <main style={{ padding: "32px 24px" }}>
-        {page === "accueil"       && <PageAccueil       consultations={consultations} patients={patients} file={file} setPage={setPage} />}
+        {page === "accueil"       && <PageAccueil       consultations={consultations} patients={patients} file={file} setPage={setPage} statsBackend={statsBackend} />}
         {page === "consultations" && <PageConsultations consultations={consultations} patients={patients} file={file} medecins={medecins} onValider={handleValider} onModifier={handleModifier} onContinuerConsultation={imprimerOrdonnance} onReprendreConsultation={handleReprendreConsultation} />}
         {page === "comptes"       && <PageComptes       comptes={comptes} setComptes={setComptes} medecins={medecins} setMedecins={setMedecins} user={user} />}
         {page === "presence"      && <PagePresence      medecins={medecins} />}
         {page === "stats"         && <PageStats         consultations={consultations} patients={patients} file={file} />}
         {page === "historique"    && <PageHistorique    consultations={consultations} patients={patients} resultatsLabo={resultatsLabo} soins={soins} rdv={rdv} />}
+        {page === "rdv"           && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div>
+                <p style={{ fontSize: 20, fontWeight: 800, color: C.textPri }}>Mes Rendez-vous</p>
+                <p style={{ fontSize: 13, color: C.textSec }}>Gérez vos rendez-vous médicaux</p>
+              </div>
+              <Btn onClick={() => setShowCreerRdv(true)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                Nouveau RDV
+              </Btn>
+            </div>
+            <div style={{ background: C.white, borderRadius: 14, padding: 24, textAlign: "center", border: "1px solid " + C.border }}>
+              <p style={{ fontSize: 14, color: C.textMuted }}>Liste des rendez-vous à implémenter</p>
+              <p style={{ fontSize: 12, color: C.textSec, marginTop: 8 }}>
+                {rdv.filter(r => r.docteurId === medecinChef.id).length} rendez-vous trouvés
+              </p>
+            </div>
+          </div>
+        )}
       </main>
 
       <style>{`

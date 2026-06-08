@@ -1,6 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 // ── Utilitaires ──────────────────────────────────────
-export const today = () => new Date().toISOString().slice(0, 10)
+// Dans shared.jsx — remplacer today() par :
+export const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  // ✅ Date locale, pas UTC
+}
 export const fmt   = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—"
 
 export const SERVICES = [

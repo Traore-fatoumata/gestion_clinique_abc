@@ -136,7 +136,114 @@ function ModalConsultationChef({ patient, consultation, medecins, onClose, onVal
     </Overlay>
   )
 }
+function ModalAntecedents({ patient, consultations, onClose }) {
+  const historiquePatient = consultations
+    .filter(c => c.patientId === patient.id && c.statut === "signe")
+    .sort((a, b) => b.date.localeCompare(a.date))
 
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.5)", zIndex:300,
+      display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}
+      onClick={e => { if(e.target===e.currentTarget) onClose() }}>
+      <div style={{ background:C.white, borderRadius:20, width:"100%", maxWidth:640,
+        maxHeight:"88vh", overflow:"auto", boxShadow:"0 25px 60px rgba(0,0,0,0.2)" }}>
+
+        {/* Header */}
+        <div style={{ padding:"20px 24px 16px", borderBottom:"1px solid "+C.border,
+          background:"linear-gradient(135deg,#6d28d9,#7c3aed)", borderRadius:"20px 20px 0 0",
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div>
+            <p style={{ fontSize:16, fontWeight:800, color:"#fff" }}>{patient.nom}</p>
+            <p style={{ fontSize:12, color:"rgba(255,255,255,0.75)" }}>
+              Antécédents & historique des consultations
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none",
+            borderRadius:8, color:"#fff", cursor:"pointer", width:32, height:32,
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>×</button>
+        </div>
+
+        <div style={{ padding:"20px 24px", display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Infos transmises par médecin chef */}
+          {(patient.antecedentsChef || patient.plaintesChef || patient.diagnosticPreliminaireChef) && (
+            <div style={{ background:C.greenSoft, border:"1px solid "+C.green+"33",
+              borderRadius:12, padding:"14px 16px" }}>
+              <p style={{ fontSize:11, fontWeight:700, color:C.green,
+                textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>
+                Transmis par le médecin chef
+              </p>
+              {patient.antecedentsChef && (
+                <p style={{ fontSize:13, marginBottom:6 }}>
+                  <strong>Antécédents :</strong> {patient.antecedentsChef}
+                </p>
+              )}
+              {patient.plaintesChef && (
+                <p style={{ fontSize:13, marginBottom:6 }}>
+                  <strong>Plaintes :</strong> {patient.plaintesChef}
+                </p>
+              )}
+              {patient.diagnosticPreliminaireChef && (
+                <p style={{ fontSize:13 }}>
+                  <strong>Diag. présomption :</strong> {patient.diagnosticPreliminaireChef}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Historique des consultations signées */}
+          {historiquePatient.length === 0 ? (
+            <p style={{ textAlign:"center", color:C.textMuted, padding:"32px 0" }}>
+              Aucune consultation signée dans l'historique
+            </p>
+          ) : historiquePatient.map((c, i) => (
+            <div key={c.id || i} style={{ border:"1px solid "+C.border,
+              borderRadius:12, overflow:"hidden" }}>
+              <div style={{ padding:"10px 16px", background:C.slateSoft,
+                borderBottom:"1px solid "+C.border,
+                display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <p style={{ fontSize:13, fontWeight:700, color:C.textPri }}>
+                  {c.date} — {c.service || "Médecine générale"}
+                </p>
+                <span style={{ fontSize:11, fontWeight:700, background:C.greenSoft,
+                  color:C.green, padding:"2px 10px", borderRadius:10 }}>Signé</span>
+              </div>
+              <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:8 }}>
+                {c.plaintes && (
+                  <p style={{ fontSize:12, color:C.textSec }}>
+                    <strong style={{ color:C.textPri }}>Plaintes :</strong> {c.plaintes}
+                  </p>
+                )}
+                {c.antecedents && (
+                  <p style={{ fontSize:12, color:C.textSec }}>
+                    <strong style={{ color:C.textPri }}>Antécédents :</strong> {c.antecedents}
+                  </p>
+                )}
+                {(c.diagDefinitif || c.diagnostics)?.length > 0 && (
+                  <p style={{ fontSize:12, color:C.textSec }}>
+                    <strong style={{ color:C.textPri }}>Diagnostics :</strong>{" "}
+                    {(c.diagDefinitif || c.diagnostics || []).join(", ")}
+                  </p>
+                )}
+                {c.traitements?.length > 0 && (
+                  <p style={{ fontSize:12, color:C.textSec }}>
+                    <strong style={{ color:C.textPri }}>Traitements :</strong>{" "}
+                    {c.traitements.join(", ")}
+                  </p>
+                )}
+                {c.poids && (
+                  <p style={{ fontSize:12, color:C.textSec }}>
+                    <strong style={{ color:C.textPri }}>Poids :</strong> {c.poids} kg
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 function ModalModifier({ consultation, patient, onClose, onModifier }) {
   const { user } = useAuth()
   const [motif,  setMotif]  = useState(consultation?.motif||consultation?.plaintes||"")
@@ -211,16 +318,30 @@ export default function PageConsultations({ consultations, patients, file, medec
   const nonSignees = mesConsultations.filter(c => !c.signe)
 
   const servicesDispo = [...new Set(consultations.map(c=>c.service))].filter(Boolean)
-  const toutesFiltrees = [...consultations]
-    .filter(c => c.signe === true)
-    .sort((a,b)=>b.date.localeCompare(a.date))
-    .filter(c=>{
-      const p=patients.find(pt=>pt.id===c.patientId)
-      const q=recherche.toLowerCase()
-      const okR=!q||(p&&p.nom.toLowerCase().includes(q))||(c.service||"").toLowerCase().includes(q)||(c.plaintes||c.motif||"").toLowerCase().includes(q)
-      const okS=filtreService==="tous"||c.service===filtreService
-      return okR&&okS
+  const toutesFiltrees = (() => {
+    // Filtrer les consultations signées
+    let result = consultations.filter(c => c.signe === true)
+    
+    // Trier par date décroissante (plus récente en premier)
+    result.sort((a,b) => b.date.localeCompare(a.date))
+    
+    // Dédupliquer par ID de consultation (évite les doublons réels dans la BDD)
+    const seenIds = new Set()
+    result = result.filter(c => {
+      if (seenIds.has(c.id)) return false
+      seenIds.add(c.id)
+      return true
     })
+    
+    // Appliquer les filtres de recherche
+    return result.filter(c => {
+      const p = patients.find(pt => pt.id === c.patientId)
+      const q = recherche.toLowerCase()
+      const okR = !q || (p && p.nom.toLowerCase().includes(q)) || (c.service || "").toLowerCase().includes(q) || (c.plaintes || c.motif || "").toLowerCase().includes(q)
+      const okS = filtreService === "tous" || c.service === filtreService
+      return okR && okS
+    })
+  })()
 
   const ONGLETS = [
     { id:"attente",      label:"File d'accueil",      count: fileAccueil.length },

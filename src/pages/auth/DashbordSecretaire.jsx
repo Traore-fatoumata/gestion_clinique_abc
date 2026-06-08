@@ -99,33 +99,39 @@ export default function DashboardSecretaire() {
     }
   }
 
-  const handleSignaler = (patient, montant, rdv) => {
-    const deja = file.find(f=>f.patientId===patient.id && f.statut !== "termine")
-    if (deja) { alert(patient.nom+" est déjà dans la file d'attente."); return }
-    const parsed = typeof montant === "string" ? parseInt(montant, 10) : Number(montant)
-    const montantConsult = Number.isFinite(parsed) ? parsed : tarifParAge(patient.dateNaissance, settings)
-    addToFile({
-      patientId: patient.id,
-      pid: patient.pid,
-      nom: patient.nom,
-      arrivee: nowTime(),
-      typeVisite: rdv ? "rendez_vous" : "consultation",
-      statut: "en_attente",
-      montantConsultation: montantConsult,
-      paiementConsultation: null,
-      service: rdv?.service || "Médecine générale",
-      docteurId: rdv?.docteurId || 1,
-      motif: rdv?.motif || "Consultation",
-      docteur: rdv?.docteur,
-      rdvId: rdv?.id,
-    })
-    if (rdv) {
-      alert(`${patient.nom} signalé directement au médecin spécialiste ${rdv.docteur} (${rdv.service}). Montant : ${montantConsult.toLocaleString("fr-FR")} GNF à payer à la comptabilité.`)
-    } else {
-      alert(`${patient.nom} signalé au médecin chef. Montant : ${montantConsult.toLocaleString("fr-FR")} GNF à payer à la comptabilité.`)
-    }
-  }
+ const handleSignaler = (patient, montant, rdv) => {
+  // ✅ CORRECTION : vérifier qu'il n'est pas déjà dans la file D'AUJOURD'HUI uniquement
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const deja = file.find(f =>
+    f.patientId === patient.id &&
+    f.statut !== "termine" &&
+    (f.dateEntree?.slice?.(0, 10) || f.dateEntree) === todayStr
+  )
+  if (deja) { alert(patient.nom + " est déjà dans la file d'attente aujourd'hui."); return }
 
+  const parsed = typeof montant === "string" ? parseInt(montant, 10) : Number(montant)
+  const montantConsult = Number.isFinite(parsed) ? parsed : tarifParAge(patient.dateNaissance, settings)
+  addToFile({
+    patientId: patient.id,
+    pid: patient.pid,
+    nom: patient.nom,
+    arrivee: nowTime(),
+    typeVisite: rdv ? "rendez_vous" : "consultation",
+    statut: "en_attente",
+    montantConsultation: montantConsult,
+    paiementConsultation: null,
+    service: rdv?.service || "Médecine générale",
+    docteurId: rdv?.docteurId || null,
+    motif: rdv?.motif || "Consultation",
+    docteur: rdv?.docteur,
+    rdvId: rdv?.id,
+  })
+  if (rdv) {
+    alert(`${patient.nom} signalé directement au médecin spécialiste ${rdv.docteur} (${rdv.service}). Montant : ${montantConsult.toLocaleString("fr-FR")} GNF à payer à la comptabilité.`)
+  } else {
+    alert(`${patient.nom} signalé au médecin chef. Montant : ${montantConsult.toLocaleString("fr-FR")} GNF à payer à la comptabilité.`)
+  }
+}
   const envoyerRappel = (rdvId) => {
     const r = rdvs.find(x => x.id === rdvId)
     updateRdv(rdvId, { rappelEnvoye: true })
@@ -407,11 +413,11 @@ export default function DashboardSecretaire() {
             {/* KPIs */}
             <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16 }}>
               {[
-                { val:fileActif.length, label:"En attente", svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, bg:C.blueSoft, fg:C.blue },
-                { val:fileActif.filter(f=>f.typeVisite==="rendez_vous").length, label:"Rendez-vous du jour", svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, bg:C.purpleSoft, fg:C.purple },
-                { val:rdvs.filter(r=>r.date===today()).length, label:"RDV aujourd'hui", svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, bg:C.slateSoft, fg:C.slate },
-              ].map(({val,label,svg,bg,fg})=>(
-                <Card key={label} style={{ padding:"20px" }}>
+                { val:fileActif.length, label:"En attente", svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, bg:C.blueSoft, fg:C.blue, page:"file" },
+                { val:fileActif.filter(f=>f.typeVisite==="rendez_vous").length, label:"Rendez-vous du jour", svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, bg:C.purpleSoft, fg:C.purple, page:"rdv" },
+                { val:rdvs.filter(r=>r.date===today()).length, label:"RDV aujourd'hui", svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, bg:C.slateSoft, fg:C.slate, page:"rdv" },
+              ].map(({val,label,svg,bg,fg,page})=>(
+                <Card key={label} style={{ padding:"20px", cursor:"pointer" }} onClick={() => setOnglet(page)}>
                   <div style={{ width:42,height:42,borderRadius:10,background:bg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,color:fg }}>{svg}</div>
                   <p style={{ fontSize:28,fontWeight:800,color:C.textPri,lineHeight:1,marginBottom:4 }}>{val}</p>
                   <p style={{ fontSize:12,color:C.textMuted }}>{label}</p>
@@ -422,8 +428,8 @@ export default function DashboardSecretaire() {
             {/* Actions rapides */}
             <div style={{ display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14 }}>
               {[
-                { label:"Nouveau patient",    desc:"Enregistrer un nouveau patient", svg:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>, action:()=>setShowNouveau(true), color:C.blue },
-                { label:"Rechercher dossier", desc:"Patient déjà enregistré",        svg:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>, action:()=>setShowRecherche(true), color:C.green },
+                { label:"Nouveau patient",    desc:"Enregistrer un nouveau patient", svg:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>, action:()=>{ setOnglet("patients"); setShowNouveau(true) }, color:C.blue },
+                { label:"Rechercher dossier", desc:"Patient déjà enregistré",        svg:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>, action:()=>{ setOnglet("patients"); setShowRecherche(true) }, color:C.green },
               ].map(({label,desc,svg,action,color})=>(
                 <Card key={label} style={{ padding:"20px",cursor:"pointer",transition:"all .15s",border:"1.5px solid "+C.border }}
                   onClick={action}

@@ -6,16 +6,17 @@ export default function PageStats({ consultations, patients, file = [] }) {
   const [specificDate, setSpecificDate] = useState("")
   const now = new Date()
 
-  const filtreDate = d => {
-    if (specificDate) return d === specificDate
-    const dp = new Date(d)
-    if (periode==="jour")    return d===today()
-    if (periode==="semaine") { const s=new Date(now); s.setDate(s.getDate()-7); return dp>=s }
-    if (periode==="mois")    { const s=new Date(now); s.setMonth(s.getMonth()-1); return dp>=s }
-    if (periode==="annee")   { const s=new Date(now); s.setFullYear(s.getFullYear()-1); return dp>=s }
-    return true
-  }
-  
+// ✅ APRÈS — normaliser d'abord la date
+const filtreDate = d => {
+  const dNorm = d?.slice(0, 10)   // ← prendre seulement YYYY-MM-DD
+  if (specificDate) return dNorm === specificDate
+  const dp = new Date(dNorm)
+  if (periode==="jour")    return dNorm === today()
+  if (periode==="semaine") { const s=new Date(now); s.setDate(s.getDate()-7); return dp>=s }
+  if (periode==="mois")    { const s=new Date(now); s.setMonth(s.getMonth()-1); return dp>=s }
+  if (periode==="annee")   { const s=new Date(now); s.setFullYear(s.getFullYear()-1); return dp>=s }
+  return true
+}
   // ── Filtrage par date ──
   const cF            = consultations.filter(c=>filtreDate(c.date))
   const normalizedFile = Array.isArray(file) ? file : []

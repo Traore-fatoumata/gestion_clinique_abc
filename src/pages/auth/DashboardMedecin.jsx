@@ -7,6 +7,7 @@ import { C, today, fmt, calcAge, Avatar, Badge, Btn, Card, CardHeader, RdvBadge,
 import ModalFichePatient from "./medecin/ModalFichePatient.jsx"
 import ModalConsultation from "./medecin/ModalConsultation.jsx"
 import ModalCreerRdvMedecin from "./medecin/ModalCreerRdvMedecin.jsx"
+import ModalOrdonnance from "./medecin/ModalOrdonnance.jsx"
 
 // ══════════════════════════════════════════════════════
 //  COMPOSANT PRINCIPAL — DASHBOARD MÉDECIN
@@ -16,7 +17,7 @@ export default function DashboardMedecin() {
   const navigate   = useNavigate()
   const handleLogout = () => { logout(); navigate("/login") }
 
-  const { patients: sharedPatients, consultations: sharedConsultations, addConsultation, file, updateFileEntry, rdv, addRdv, removeRdv, notifs, marquerNotifLue, marquerToutesLues, rafraichir } = useSharedData()
+  const { patients: sharedPatients, consultations: sharedConsultations, addConsultation, deleteConsultation, file, updateFileEntry, rdv, addRdv, removeRdv, notifs, marquerNotifLue, marquerToutesLues, rafraichir } = useSharedData()
 
   const medecin = { id: user?.id || 2, nom: user?.nom || "Dr. Keïta", specialite: user?.specialite || "Médecine générale" }
 
@@ -33,6 +34,7 @@ export default function DashboardMedecin() {
   const [recherche, setRecherche]         = useState("")
   const [mFiche,   setMFiche]             = useState(null)
   const [mConsult, setMConsult]           = useState(null)
+  const [mOrdonnance, setMOrdonnance]     = useState(null)
 
   useEffect(() => {
     if (!mConsult?.patient?.id) return
@@ -78,23 +80,22 @@ export default function DashboardMedecin() {
   const mesPatients = (() => {
     const byPatient = new Map()
     const todayStr = today()
-    consultations.forEach(c => {
-      if (Number(c.docteurId) !== Number(medecin.id)) return
-      if ((c.date?.slice(0, 10) || c.date) !== todayStr) return
-      if (c.signe) return
-      const pat = sharedPatients.find(p => p.id === c.patientId) || {}
-      const f = file.find(x => x.patientId === c.patientId && x.statut !== "termine") || {}
-      byPatient.set(c.patientId, { ...pat, ...f, id: c.patientId, fileId: f.id, consultation: c })
-    })
+    
+    // Only show patients from file who are explicitly assigned to this doctor
+    // Patients should only appear here after the chief doctor has assigned them
     file.forEach(f => {
       if (Number(f.docteurId) !== Number(medecin.id) || f.statut === "termine") return
-      if (byPatient.has(f.patientId)) return
       const pat = sharedPatients.find(p => p.id === f.patientId) || {}
+      // Only look for UNSIGNED consultations from today that are assigned to this doctor
       const c = consultations.find(x =>
-        x.patientId === f.patientId && (x.date?.slice(0, 10) || x.date) === todayStr && Number(x.docteurId) === Number(medecin.id)
+        x.patientId === f.patientId && 
+        (x.date?.slice(0, 10) || x.date) === todayStr && 
+        Number(x.docteurId) === Number(medecin.id) &&
+        !x.signe  // Only unsigned consultations
       )
       byPatient.set(f.patientId, { ...pat, ...f, id: f.patientId, fileId: f.id, consultation: c || null })
     })
+    
     return [...byPatient.values()]
   })()
 
@@ -110,20 +111,35 @@ export default function DashboardMedecin() {
 
   const ouvrirConsultation = (patient) => {
     const todayStr = today()
+    // Only load unsigned consultations from today - for new consultations, start fresh
     const existing = patient.consultation || consultations.find(c =>
       Number(c.patientId) === Number(patient.id) &&
       (c.date?.slice(0, 10) || c.date) === todayStr &&
-      Number(c.docteurId) === Number(medecin.id)
+      Number(c.docteurId) === Number(medecin.id) &&
+      !c.signe  // Only unsigned consultations
     )
     setMConsult({ patient, consultation: existing || null })
   }
 
   const handleSauvegarder = async (data) => {
     const patientId = mConsult.patient.id
+    const todayStr = today()
     try {
+      // Supprimer les consultations non signées existantes pour ce patient aujourd'hui
+      // pour éviter les doublons
+      const anciennesASupprimer = consultations.filter(c =>
+        Number(c.patientId) === Number(patientId)
+        && (c.date?.slice(0, 10) || c.date) === todayStr
+        && Number(c.docteurId) === Number(medecin.id)
+        && !c.signe
+      )
+      for (const ac of anciennesASupprimer) {
+        if (ac.id) await deleteConsultation(ac.id)
+      }
+
       await addConsultation({
         patientId,
-        date: today(),
+        date: todayStr,
         service: medecin.specialite,
         docteurId: medecin.id,
         signe: false,
@@ -142,15 +158,28 @@ export default function DashboardMedecin() {
   const handleSigner = async (data) => {
     const patientId = mConsult.patient.id
     const c = mConsult.consultation
+    const todayStr = today()
     if ((data.examensCommandes?.length > 0) && !c?.laboValide) {
       alert("Signature impossible : résultats du laboratoire non validés.")
       return
     }
     const ts = new Date().toLocaleString("fr-FR")
     try {
+      // Supprimer les consultations non signées existantes pour ce patient aujourd'hui
+      // pour éviter les doublons
+      const anciennesASupprimer = consultations.filter(c =>
+        Number(c.patientId) === Number(patientId)
+        && (c.date?.slice(0, 10) || c.date) === todayStr
+        && Number(c.docteurId) === Number(medecin.id)
+        && !c.signe
+      )
+      for (const ac of anciennesASupprimer) {
+        if (ac.id) await deleteConsultation(ac.id)
+      }
+
       await addConsultation({
         patientId,
-        date: today(),
+        date: todayStr,
         service: medecin.specialite,
         docteurId: medecin.id,
         signe: true,
@@ -199,6 +228,14 @@ export default function DashboardMedecin() {
           medecin={medecin}
           onClose={()=>setMFiche(null)}
           onConsulter={p=>{ ouvrirConsultation(p) }}
+        />
+      )}
+      {mOrdonnance && (
+        <ModalOrdonnance
+          patient={mOrdonnance.patient}
+          consultation={mOrdonnance.consultation}
+          medecin={medecin}
+          onClose={()=>setMOrdonnance(null)}
         />
       )}
       {showCreerRdv && (
@@ -380,7 +417,7 @@ export default function DashboardMedecin() {
               {[
                 { val:mesPatients.length,                         label:"Patients assignés",    bg:C.blueSoft,  fg:C.blue,  icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
                 { val:enAttente,                                  label:"En attente",           bg:C.slateSoft, fg:C.slate, icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
-                { val:mesConsultations.filter(c=>c.signe).length, label:"Consultations signées", bg:C.greenSoft, fg:C.green, icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 13"/></svg> },
+                { val:sharedConsultations.filter(c=>Number(c.docteurId)===Number(medecin.id)&&c.signe).length, label:"Consultations signées", bg:C.greenSoft, fg:C.green, icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 13"/></svg> },
               ].map(({val,label,bg,fg,icon})=>(
                 <Card key={label} style={{ padding:"22px 20px" }}>
                   <div style={{ width:46, height:46, borderRadius:12, background:bg, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:14, color:fg }}>{icon}</div>
@@ -614,53 +651,63 @@ export default function DashboardMedecin() {
               </div>
             )}
             <Card>
-              <CardHeader title={"Mes consultations — "+mesConsultations.length+" au total"} />
+              <div style={{ padding:"16px 20px", borderBottom:"1px solid "+C.border }}>
+                <p style={{ fontSize:15, fontWeight:700, color:C.textPri }}>Mes consultations — {mesConsultations.length} au total</p>
+                <p style={{ fontSize:13, color:C.textMuted }}>{nonSignees} non signée{nonSignees>1?"s":""}</p>
+              </div>
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
                   <tr style={{ background:C.slateSoft }}>
-                    {["Patient","Date","Type","Motif","Diagnostic","Traitement","Signature","Action"].map(h=>(
-                      <th key={h} style={{ padding:"11px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:C.textSec, letterSpacing:"0.06em", textTransform:"uppercase" }}>{h}</th>
+                    {["Patient","Date","Motif / Plaintes","Diagnostic","Statut","Action"].map(h=>(
+                      <th key={h} style={{ padding:"11px 12px", textAlign:"left", fontSize:11, fontWeight:700, color:C.textSec, textTransform:"uppercase", letterSpacing:"0.05em" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {mesConsultations.length===0
-                    ? <tr><td colSpan={8} style={{ padding:40, textAlign:"center", color:C.textMuted }}>Aucune consultation enregistrée</td></tr>
+                    ? <tr><td colSpan={6} style={{ padding:40, textAlign:"center", color:C.textMuted }}>Aucune consultation enregistrée</td></tr>
                     : [...mesConsultations].sort((a,b)=>b.date.localeCompare(a.date)).map((c,i,arr)=>{
                         const p = sharedPatients.find(pt=>pt.id===c.patientId)
                         if (!p) return null
                         return (
-                          <tr key={c.id} style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none", background:!c.signe?"#fff8f8":"transparent", transition:"background .15s" }}
+                          <tr key={c.id}
+                            style={{ borderBottom:i<arr.length-1?"1px solid "+C.border:"none", background:!c.signe?"#fff8f8":"transparent", transition:"background .15s" }}
                             onMouseEnter={e=>e.currentTarget.style.background=C.slateSoft}
                             onMouseLeave={e=>e.currentTarget.style.background=!c.signe?"#fff8f8":"transparent"}>
-                            <td style={{ padding:"13px 16px" }}>
+                            <td style={{ padding:"12px 12px" }}>
                               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                                <Avatar name={p.nom} size={28} />
+                                <Avatar name={p.nom} size={30}/>
                                 <p style={{ fontSize:13, fontWeight:600, color:C.textPri }}>{p.nom}</p>
                               </div>
                             </td>
-                            <td style={{ padding:"13px 16px", fontSize:12, color:C.textMuted }}>{fmt(c.date)}</td>
-                            <td style={{ padding:"13px 16px" }}>{c.typeConsultation && c.typeConsultation !== "standard"
-                              ? <TypeConsultBadge type={c.typeConsultation} />
-                              : <span style={{ fontSize:12, color:C.textMuted }}>Standard</span>}
-                            </td>
-                            <td style={{ padding:"13px 16px", fontSize:12, color:C.textSec }}>{c.motif||"—"}</td>
-                            <td style={{ padding:"13px 16px", fontSize:12, color:C.textPri }}>{c.diagnostics?.join(", ")||"—"}</td>
-                            <td style={{ padding:"13px 16px", fontSize:12, color:C.textSec }}>{c.traitements?.join(", ")||"—"}</td>
-                            <td style={{ padding:"13px 16px" }}>
+                            <td style={{ padding:"12px 12px", fontSize:12, color:C.textMuted }}>{fmt(c.date)}</td>
+                            <td style={{ padding:"12px 12px", fontSize:12, color:C.textSec, maxWidth:160 }}>{c.plaintes||c.motif||"—"}</td>
+                            <td style={{ padding:"12px 12px", fontSize:12, color:C.textSec }}>{(c.diagnostics||[]).join(", ")||"—"}</td>
+                            <td style={{ padding:"12px 12px" }}>
                               {c.signe
-                                ? <div>
-                                    <Badge statut="signe" />
-                                    <p style={{ fontSize:10, color:C.textMuted, marginTop:3 }}>{c.signeLe}</p>
-                                  </div>
-                                : <Badge statut="non_signe" />
+                                ? <span style={{ fontSize:11,fontWeight:700,background:C.greenSoft,color:C.green,padding:"3px 10px",borderRadius:20 }}>Signé</span>
+                                : <span style={{ fontSize:11,fontWeight:700,background:"#fee2e2",color:C.red,padding:"3px 10px",borderRadius:20 }}>Non signé</span>
                               }
                             </td>
-                            <td style={{ padding:"13px 16px" }}>
-                              {!c.signe && (
-                                <Btn onClick={()=>setMConsult({patient:p,consultation:c})} small variant="success">
-                                  Signer
-                                </Btn>
+                            <td style={{ padding:"12px 12px", display:"flex", gap:6 }}>
+                              {c.signe ? (
+                                <>
+                                  <button onClick={()=>setMConsult({patient:p,consultation:c})}
+                                    style={{ padding:"6px 12px", border:"1px solid "+C.slate+"44", borderRadius:8, background:C.slateSoft, color:C.slate, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                                    Modifier
+                                  </button>
+                                  <button onClick={()=>setMOrdonnance({patient:p,consultation:c})}
+                                    style={{ padding:"6px 12px", border:"none", borderRadius:8, background:C.blue, color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:4 }}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ marginRight:4 }}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                    Ordonnance
+                                  </button>
+                                </>
+                              ) : (
+                                <button onClick={()=>setMConsult({patient:p,consultation:c})}
+                                  style={{ padding:"6px 12px", border:"none", borderRadius:8, background:C.green, color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:4 }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                  Continuer
+                                </button>
                               )}
                             </td>
                           </tr>

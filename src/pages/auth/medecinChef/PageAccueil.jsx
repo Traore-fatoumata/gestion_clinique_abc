@@ -2,17 +2,21 @@ import { useAuth } from "../../../hooks/useAuth.jsx"
 import { today, C, Card, CardHeader, Avatar, StatutBadge } from "./shared.jsx"
 import { estEnAttenteAccueil, calcRecettesJour } from "../../../utils/clinicFlow.js"
 
-export default function PageAccueil({ consultations, patients, file, setPage }) {
+export default function PageAccueil({ consultations, patients, file, setPage, statsBackend }) {
   const { user } = useAuth()
   const todayStr     = today()
   const normalizedFile = Array.isArray(file) ? file : []
-  const consultAuj   = consultations.filter(c => (c.date?.slice?.(0, 10) || c.date) === todayStr)
+  // Compter uniquement les consultations signées (validées) pour éviter les doublons
+  // (le triage non signé ne doit pas être compté comme une consultation complète)
+  const consultAuj   = consultations.filter(c =>
+    (c.date?.slice?.(0, 10) || c.date) === todayStr && c.signe === true
+  )
   const enAttente    = normalizedFile.filter(f => estEnAttenteAccueil(f, consultations))
 
-  const recettesAuj = calcRecettesJour(normalizedFile, todayStr)
+  const recettesAuj = statsBackend?.recetteJour ?? calcRecettesJour(normalizedFile, todayStr)
 
-  // Calcul des recettes totales : consultations payées + paiements file
-  const recettesTot = normalizedFile.reduce((s, f) => {
+  // Calcul des recettes totales : consultations payées + paiements file (fallback si statsBackend absent)
+  const recettesTot = statsBackend?.recetteTotal ?? normalizedFile.reduce((s, f) => {
     let t = s
     if (f.paiementConsultation?.statut === "paye") {
       t += Number(f.paiementConsultation?.montant ?? f.montantConsultation ?? 0)
@@ -23,10 +27,10 @@ export default function PageAccueil({ consultations, patients, file, setPage }) 
     return t
   }, 0)
 
-  // Calcul des recettes du mois
+  // Calcul des recettes du mois (fallback si statsBackend absent)
   const now = new Date()
   const thisMonth = (d) => { const dp = new Date(d); return dp.getMonth() === now.getMonth() && dp.getFullYear() === now.getFullYear() }
-  const recettesMois = normalizedFile.reduce((s, f) => {
+  const recettesMois = statsBackend?.recetteMois ?? normalizedFile.reduce((s, f) => {
     if (!thisMonth(f.dateEntree)) return s
     let t = s
     if (f.paiementConsultation?.statut === "paye") {
@@ -66,12 +70,12 @@ export default function PageAccueil({ consultations, patients, file, setPage }) 
       {/* KPIs */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:24 }}>
         {[
-          { label:"Patients total",        val:patients.length,                              fg:C.blue,   bg:C.blueSoft,   svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
-          { label:"Consultations du jour", val:consultAuj.length,                            fg:C.green,  bg:C.greenSoft,  svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
-          { label:"En attente",            val:enAttente.length,                             fg:C.slate,  bg:C.slateSoft,  svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
-          { label:"Recettes du mois (GNF)",val:(recettesMois/1000).toFixed(0)+"K",          fg:C.purple, bg:C.purpleSoft, svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
-        ].map(({label,val,bg,svg})=>(
-          <Card key={label} style={{ padding:"20px" }}>
+          { label:"Patients total",        val:patients.length,                              fg:C.blue,   bg:C.blueSoft,   svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, page:"historique" },
+          { label:"Consultations du jour", val:consultAuj.length,                            fg:C.green,  bg:C.greenSoft,  svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>, page:"consultations" },
+          { label:"En attente",            val:enAttente.length,                             fg:C.slate,  bg:C.slateSoft,  svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, page:"consultations" },
+          { label:"Recettes du mois (GNF)",val:(recettesMois/1000).toFixed(0)+"K",          fg:C.purple, bg:C.purpleSoft, svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>, page:"stats" },
+        ].map(({label,val,bg,svg,page})=>(
+          <Card key={label} style={{ padding:"20px", cursor:"pointer" }} onClick={() => setPage(page)}>
             <div style={{ width:42,height:42,borderRadius:10,background:bg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,color:C.textPri }}>{svg}</div>
             <p style={{ fontSize:28,fontWeight:800,color:C.textPri,lineHeight:1,marginBottom:4 }}>{val}</p>
             <p style={{ fontSize:12,color:C.textMuted }}>{label}</p>

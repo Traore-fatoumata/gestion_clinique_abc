@@ -690,67 +690,130 @@ export default function ModalConsultation({
           {/* Boutons */}
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, paddingTop:8, borderTop:"1px solid "+C.border }}>
             <Btn onClick={()=>{
-              const date = new Date().toLocaleDateString("fr-FR")
-              const traitement = form.traitements||"—"
-              const diagnostic = form.diagDefinitif || form.diagPresomption || "—"
-              const poidsStr = form.poids ? `${form.poids} kg` : "Non renseigné"
-              const w = window.open("","_blank","width=700,height=900")
-              w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ordonnance</title><style>
-                *{box-sizing:border-box}
-                body{font-family:'Segoe UI',sans-serif;margin:0;padding:36px 40px;color:#000;font-size:13px}
-                .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #16a34a;padding-bottom:14px;margin-bottom:20px}
-                .hclinic{flex:1}
-                .title{font-size:20px;font-weight:800;color:#16a34a;margin:0 0 3px}
-                .sub{font-size:11px;color:#555;margin:2px 0}
-                .hdate{text-align:right;font-size:12px;color:#333}
-                .hdate strong{font-size:14px;display:block;margin-bottom:2px}
-                .ord-title{font-size:17px;font-weight:800;text-align:center;letter-spacing:.04em;margin:0 0 18px;text-transform:uppercase;color:#111}
-                .patient-box{border:1.5px solid #16a34a33;border-radius:8px;overflow:hidden;margin-bottom:20px}
-                .patient-box-header{background:#f0faf4;padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#16a34a;border-bottom:1px solid #16a34a22}
-                .patient-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
-                .pi-item{padding:10px 14px;border-right:1px solid #e5e7eb}
-                .pi-item:last-child{border-right:none}
-                .pi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:3px}
-                .pi-value{font-size:14px;font-weight:700;color:#111}
-                .section{margin-bottom:16px}
-                .sec-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e5e7eb}
-                .sec-value{font-size:13px;padding:9px 12px;background:#fafafa;border-radius:6px;border:1px solid #e5e7eb;line-height:1.6}
-                .rx{font-size:28px;font-weight:900;color:#16a34a;margin:0 0 6px;line-height:1}
-                .footer{margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#888;border-top:1px solid #e5e7eb;padding-top:14px}
-                .sign-box{text-align:center;border-top:1.5px solid #111;padding-top:6px;width:200px;font-size:11px;color:#333}
-                @media print{body{padding:20px 24px}}
-              </style></head><body>
-              <div class="header">
-                <div class="hclinic">
-                  <div class="title">Clinique Médicale ABC Marouane</div>
-                  <div class="sub">Tannerie, Kaloum · Conakry, République de Guinée</div>
-                  <div class="sub">Tél : +224 624 00 00 00</div>
-                  <div class="sub">Service : ${medecin?.specialite||"—"}</div>
-                </div>
-                <div class="hdate">
-                  <strong>Date</strong>
-                  ${date}
-                </div>
-              </div>
-              <div class="ord-title">Ordonnance Médicale</div>
-              <div class="patient-box">
-                <div class="patient-box-header">Informations du patient</div>
-                <div class="patient-grid">
-                  <div class="pi-item"><div class="pi-label">Nom &amp; Prénom</div><div class="pi-value">${patient?.sexe==="F"?"Mme":"M."} ${patient?.nom||"—"}</div></div>
-                  <div class="pi-item"><div class="pi-label">Âge</div><div class="pi-value">${age} ans</div></div>
-                  <div class="pi-item"><div class="pi-label">Poids</div><div class="pi-value">${poidsStr}</div></div>
-                </div>
-              </div>
-              <div class="rx">℞</div>
-              <div class="section"><div class="sec-label">Diagnostic</div><div class="sec-value">${diagnostic}</div></div>
-              <div class="section"><div class="sec-label">Prescriptions</div><div class="sec-value">${traitement.split(",").map((t,i)=>`<div style="margin-bottom:6px"><strong>${i+1}.</strong> ${t.trim()}</div>`).join("")}</div></div>
-              ${form.commentaires?`<div class="section"><div class="sec-label">Commentaires / Suivi</div><div class="sec-value">${form.commentaires}</div></div>`:""}
-              <div class="footer">
-                <div>Valable 3 mois à compter du ${date}</div>
-                <div class="sign-box">Signature &amp; Cachet du médecin</div>
-              </div></body></html>`)
-              w.document.close(); setTimeout(()=>w.print(),400)
-            }} variant="secondary">
+              // Remplacer le bloc w.document.write(...) dans les deux ModalConsultation
+const date = new Date().toLocaleDateString("fr-FR")
+const traitement = form.traitements || "—"
+const diagnostic = form.diagDefinitif || form.diagPresomption || "—"
+const poidsStr = form.poids ? `${form.poids} kg` : "—"
+// Infos cliniques complémentaires
+const tailleStr = prenatal?.tailleCm ? `${prenatal.tailleCm} cm` :
+                  form.taille       ? `${form.taille} cm` : "—"
+const taStr = prenatal?.ta || form.ta || "—"
+const dateNaissStr = patient?.dateNaissance
+  ? new Date(patient.dateNaissance).toLocaleDateString("fr-FR")
+  : "—"
+const sexeStr = patient?.sexe === "F" ? "Féminin" :
+               patient?.sexe === "M" ? "Masculin" : "—"
+const antecedentsStr = form.antecedents || "—"
+
+const w = window.open("", "_blank", "width=720,height=960")
+w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Ordonnance — ${patient?.nom||""}</title><style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;margin:0;padding:36px 40px;color:#000;font-size:13px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #16a34a;padding-bottom:14px;margin-bottom:20px}
+.hclinic{flex:1}.title{font-size:20px;font-weight:800;color:#16a34a;margin:0 0 3px}
+.sub{font-size:11px;color:#555;margin:2px 0}
+.hdate{text-align:right;font-size:12px;color:#333}
+.hdate strong{font-size:14px;display:block;margin-bottom:2px}
+.ord-title{font-size:17px;font-weight:800;text-align:center;letter-spacing:.04em;margin:0 0 18px;text-transform:uppercase;color:#111}
+.patient-box{border:1.5px solid #16a34a33;border-radius:8px;overflow:hidden;margin-bottom:20px}
+.patient-box-header{background:#f0faf4;padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#16a34a;border-bottom:1px solid #16a34a22}
+.patient-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.patient-grid-2{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.pi-item{padding:10px 14px;border-right:1px solid #e5e7eb}
+.pi-item:last-child{border-right:none}
+.pi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:3px}
+.pi-value{font-size:13px;font-weight:700;color:#111}
+.section{margin-bottom:16px}
+.sec-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e5e7eb}
+.sec-value{font-size:13px;padding:9px 12px;background:#fafafa;border-radius:6px;border:1px solid #e5e7eb;line-height:1.6}
+.rx{font-size:28px;font-weight:900;color:#16a34a;margin:0 0 6px;line-height:1}
+.footer{margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#888;border-top:1px solid #e5e7eb;padding-top:14px}
+.sign-box{text-align:center;border-top:1.5px solid #111;padding-top:6px;width:220px;font-size:11px;color:#333}
+.medecin-info{font-size:12px;color:#333;font-weight:600;margin-bottom:2px}
+@media print{body{padding:20px 24px}}
+</style></head><body>
+<div class="header">
+  <div class="hclinic">
+    <div class="title">Clinique Médicale ABC Marouane</div>
+    <div class="sub">Tannerie, Kaloum · Conakry, République de Guinée</div>
+    <div class="sub">Tél : +224 624 00 00 00</div>
+    <div class="sub">Service : ${medecin?.specialite||"—"}</div>
+  </div>
+  <div class="hdate"><strong>Date</strong>${date}</div>
+</div>
+<div class="ord-title">Ordonnance Médicale</div>
+<div class="patient-box">
+  <div class="patient-box-header">Informations du patient</div>
+  <div class="patient-grid">
+    <div class="pi-item">
+      <div class="pi-label">Nom &amp; Prénom</div>
+      <div class="pi-value">${patient?.sexe==="F"?"Mme":"M."} ${patient?.nom||"—"}</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Date de naissance</div>
+      <div class="pi-value">${dateNaissStr}</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Âge</div>
+      <div class="pi-value">${age} ans</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Sexe</div>
+      <div class="pi-value">${sexeStr}</div>
+    </div>
+  </div>
+  <div class="patient-grid-2" style="border-top:1px solid #e5e7eb">
+    <div class="pi-item">
+      <div class="pi-label">Poids</div>
+      <div class="pi-value">${poidsStr}</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Taille</div>
+      <div class="pi-value">${tailleStr}</div>
+    </div>
+    <div class="pi-item">
+      <div class="pi-label">Tension artérielle</div>
+      <div class="pi-value">${taStr}</div>
+    </div>
+  </div>
+  ${antecedentsStr !== "—" ? `
+  <div style="padding:8px 14px;border-top:1px solid #e5e7eb;background:#fffbf0">
+    <div class="pi-label" style="margin-bottom:3px">Antécédents médicaux</div>
+    <div style="font-size:12px;color:#333">${antecedentsStr}</div>
+  </div>` : ""}
+</div>
+<div class="rx">℞</div>
+<div class="section">
+  <div class="sec-label">Diagnostic</div>
+  <div class="sec-value">${diagnostic}</div>
+</div>
+<div class="section">
+  <div class="sec-label">Prescriptions</div>
+  <div class="sec-value">
+    ${traitement.split(",").map((t,i)=>
+      `<div style="margin-bottom:6px"><strong>${i+1}.</strong> ${t.trim()}</div>`
+    ).join("")}
+  </div>
+</div>
+${form.commentaires ? `
+<div class="section">
+  <div class="sec-label">Commentaires / Suivi</div>
+  <div class="sec-value">${form.commentaires}</div>
+</div>` : ""}
+<div class="footer">
+  <div>Valable 3 mois à compter du ${date}</div>
+  <div class="sign-box">
+    <div class="medecin-info">Dr. ${medecin?.nom || "—"}</div>
+    <div class="medecin-info" style="font-weight:400;font-size:11px">${medecin?.specialite||""}</div>
+    <div style="margin-top:28px">Signature &amp; Cachet du médecin</div>
+  </div>
+</div></body></html>`)
+w.document.close()
+setTimeout(() => w.print(), 400)
+            }} 
+            variant="secondary">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               Imprimer ordonnance
             </Btn>
