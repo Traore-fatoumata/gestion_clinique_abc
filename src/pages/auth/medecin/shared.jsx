@@ -32,6 +32,7 @@ export const EXAMENS_PAR_CATEGORIE = {
     { nom:"NFS (numération formule sanguine)", prix:25000 },
     { nom:"Glycémie à jeun", prix:15000 },
     { nom:"Bilan rénal (créatinine, urée)", prix:30000 },
+    { nom:"Bilan rénal (créatinine)", prix:30000 },
     { nom:"Bilan hépatique (ASAT, ALAT, GGT)", prix:35000 },
     { nom:"Groupe sanguin / Rhésus", prix:10000 },
     { nom:"HIV (sérologie)", prix:20000 },

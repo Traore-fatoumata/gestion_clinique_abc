@@ -9,6 +9,7 @@ import ModalNouveauPatient from "./secretaire/ModalNouveauPatient.jsx"
 import ModalRechercheDossier from "./secretaire/ModalRechercheDossier.jsx"
 import ModalPermission from "./secretaire/ModalPermission.jsx"
 import ModalHistorique from "./secretaire/ModalHistorique.jsx"
+import ModalModifierPatient from "./ModalModifierPatient.jsx"
 import { estEnAttenteAccueil } from "../../utils/clinicFlow.js"
 
 // ══════════════════════════════════════════════════════
@@ -30,6 +31,7 @@ export default function DashboardSecretaire() {
   const [dateStr,      setDateStr]      = useState("")
   const [showNouveau,  setShowNouveau]  = useState(false)
   const [showRecherche,setShowRecherche]= useState(false)
+  const [editPatient,  setEditPatient]  = useState(null)
   const [notifications,setNotifications]= useState([])
   const [showNotifs, setShowNotifs]=useState(false)
   const [recherchePatients, setRecherchePatients]=useState("")
@@ -77,8 +79,6 @@ export default function DashboardSecretaire() {
 
     try {
       const createdPatient = await addPatient(nouveau)
-      const parsedMont = parseInt(form.montantConsultation, 10)
-      const montantForFile = Number.isFinite(parsedMont) ? parsedMont : tarifParAge(form.dateNaissance, settings)
       await addToFile({
         patientId: createdPatient.id,
         pid: createdPatient.pid,
@@ -86,7 +86,7 @@ export default function DashboardSecretaire() {
         arrivee: nowTime(),
         typeVisite: "consultation",
         statut: "en_attente",
-        montantConsultation: montantForFile,
+        montantConsultation: 0,
         paiementConsultation: null,
         motif: "Consultation — accueil",
         service: "Accueil",
@@ -109,8 +109,6 @@ export default function DashboardSecretaire() {
   )
   if (deja) { alert(patient.nom + " est déjà dans la file d'attente aujourd'hui."); return }
 
-  const parsed = typeof montant === "string" ? parseInt(montant, 10) : Number(montant)
-  const montantConsult = Number.isFinite(parsed) ? parsed : tarifParAge(patient.dateNaissance, settings)
   addToFile({
     patientId: patient.id,
     pid: patient.pid,
@@ -118,7 +116,7 @@ export default function DashboardSecretaire() {
     arrivee: nowTime(),
     typeVisite: rdv ? "rendez_vous" : "consultation",
     statut: "en_attente",
-    montantConsultation: montantConsult,
+    montantConsultation: 0,
     paiementConsultation: null,
     service: rdv?.service || "Médecine générale",
     docteurId: rdv?.docteurId || null,
@@ -127,9 +125,9 @@ export default function DashboardSecretaire() {
     rdvId: rdv?.id,
   })
   if (rdv) {
-    alert(`${patient.nom} signalé directement au médecin spécialiste ${rdv.docteur} (${rdv.service}). Montant : ${montantConsult.toLocaleString("fr-FR")} GNF à payer à la comptabilité.`)
+    alert(`${patient.nom} signalé directement au médecin spécialiste ${rdv.docteur} (${rdv.service}).`)
   } else {
-    alert(`${patient.nom} signalé au médecin chef. Montant : ${montantConsult.toLocaleString("fr-FR")} GNF à payer à la comptabilité.`)
+    alert(`${patient.nom} signalé au médecin chef.`)
   }
 }
   const envoyerRappel = (rdvId) => {
@@ -295,6 +293,7 @@ export default function DashboardSecretaire() {
       {showRecherche && <ModalRechercheDossier patients={patients} rdvs={rdvs} onClose={()=>setShowRecherche(false)} onSignaler={handleSignaler}/>}
       {permissionModal && <ModalPermission medecin={permissionModal.medecin} onClose={()=>setPermissionModal(null)} onValider={validerPermission}/>}
       {onglet === "historique" && <ModalHistorique medecins={medecins} historique={historique} onClose={()=>setOnglet("presence")}/>}
+      {editPatient && <ModalModifierPatient patient={editPatient} onClose={()=>setEditPatient(null)} />}
 
       {/* SIDEBAR */}
       {sidebarOpen&&(
@@ -606,12 +605,20 @@ export default function DashboardSecretaire() {
                         </td>
                         <td style={{ padding:"12px 14px",fontSize:13,color:C.textSec }}>{p.responsable||"—"}</td>
                         <td style={{ padding:"12px 14px" }}>
-                          <button onClick={()=>handleSignaler(p)}
-                            style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",background:C.greenSoft,border:"1px solid "+C.green+"33",borderRadius:8,color:C.green,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap" }}
-                            onMouseEnter={e=>{ e.currentTarget.style.background=C.green; e.currentTarget.style.color="#fff" }}
-                            onMouseLeave={e=>{ e.currentTarget.style.background=C.greenSoft; e.currentTarget.style.color=C.green }}>
-                            Envoyer au médecin
-                          </button>
+                          <div style={{ display:"flex", gap:6 }}>
+                            <button onClick={()=>handleSignaler(p)}
+                              style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",background:C.greenSoft,border:"1px solid "+C.green+"33",borderRadius:8,color:C.green,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap" }}
+                              onMouseEnter={e=>{ e.currentTarget.style.background=C.green; e.currentTarget.style.color="#fff" }}
+                              onMouseLeave={e=>{ e.currentTarget.style.background=C.greenSoft; e.currentTarget.style.color=C.green }}>
+                              Envoyer au médecin
+                            </button>
+                            <button onClick={()=>setEditPatient(p)}
+                              style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",background:C.blueSoft,border:"1px solid "+C.blue+"33",borderRadius:8,color:C.blue,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap" }}
+                              onMouseEnter={e=>{ e.currentTarget.style.background=C.blue; e.currentTarget.style.color="#fff" }}
+                              onMouseLeave={e=>{ e.currentTarget.style.background=C.blueSoft; e.currentTarget.style.color=C.blue }}>
+                              Modifier
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

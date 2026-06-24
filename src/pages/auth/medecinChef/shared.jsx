@@ -72,88 +72,319 @@ export const PATHOLOGIES_COMMUNES = [
 ]
 
 export const EXAMENS_PAR_CATEGORIE = {
-  "Laboratoire": [
-    { nom:"NFS (numération formule sanguine)", prix:25000 },
-    { nom:"Glycémie à jeun", prix:15000 },
-    { nom:"Bilan rénal (créatinine, urée)", prix:30000 },
-    { nom:"Bilan hépatique (ASAT, ALAT, GGT)", prix:35000 },
-    { nom:"Groupe sanguin / Rhésus", prix:10000 },
-    { nom:"HIV (sérologie)", prix:20000 },
-    { nom:"TPHA / VDRL (syphilis)", prix:20000 },
-    { nom:"Goutte épaisse / TDR paludisme", prix:15000 },
-    { nom:"ECBU (examen cytobactériologique)", prix:25000 },
-    { nom:"Coproculture", prix:20000 },
-    { nom:"CRP (protéine C-réactive)", prix:20000 },
-    { nom:"VS (vitesse de sédimentation)", prix:10000 },
-    { nom:"Hémoculture", prix:30000 },
-    { nom:"Test de grossesse (β-hCG)", prix:15000 },
-    { nom:"Uricémie (acide urique)", prix:15000 },
-    { nom:"Lipidogramme (cholestérol total, HDL, LDL, TG)", prix:35000 },
-    { nom:"PSA (prostate)", prix:30000 },
-    { nom:"CA-125 (marqueur ovarien)", prix:40000 },
-    { nom:"ACE (marqueur colorectal)", prix:35000 },
+  "1. HÉMATOLOGIE": {
+    "Numération et formule sanguine": [
+      { nom: "NFS (Numération Formule Sanguine)", prix: 25000 },
+      { nom: "Hémogramme complet", prix: 25000 },
+      { nom: "Taux d'hémoglobine", prix: 10000 },
+      { nom: "Hématocrite", prix: 8000 },
+      { nom: "Numération leucocytaire", prix: 12000 },
+      { nom: "Numération plaquettaire", prix: 12000 },
+      { nom: "Réticulocytes", prix: 15000 },
+    ],
+    "Études des cellules sanguines": [
+      { nom: "Frottis sanguin", prix: 15000 },
+      { nom: "Électrophorèse de l'hémoglobine", prix: 40000 },
+      { nom: "Test d'Emmel", prix: 20000 },
+      { nom: "Recherche de drépanocytose", prix: 25000 },
+    ],
+    "Groupage sanguin": [
+      { nom: "Groupe sanguin ABO", prix: 8000 },
+      { nom: "Rhésus", prix: 8000 },
+      { nom: "Coombs direct", prix: 20000 },
+      { nom: "Coombs indirect", prix: 25000 },
+    ],
+    "Hémostase": [
+      { nom: "TP (Taux de Prothrombine)", prix: 15000 },
+      { nom: "INR", prix: 15000 },
+      { nom: "TCA/TCK", prix: 15000 },
+      { nom: "Fibrinogène", prix: 18000 },
+      { nom: "Temps de saignement", prix: 10000 },
+      { nom: "Temps de coagulation", prix: 10000 },
+      { nom: "D-Dimères", prix: 30000 },
+    ],
+  },
+  "2. BIOCHIMIE": {
+    "Diabète": [
+      { nom: "Glycémie à jeun", prix: 15000 },
+      { nom: "Glycémie postprandiale", prix: 15000 },
+      { nom: "HbA1c", prix: 25000 },
+      { nom: "Hyperglycémie provoquée", prix: 30000 },
+    ],
+    "Fonction rénale": [
+      { nom: "Urée", prix: 12000 },
+      { nom: "Créatinine", prix: 12000 },
+      { nom: "Acide urique", prix: 15000 },
+      { nom: "Clairance de la créatinine", prix: 20000 },
+    ],
+    "Bilan hépatique": [
+      { nom: "ALAT", prix: 12000 },
+      { nom: "ASAT", prix: 12000 },
+      { nom: "Gamma GT", prix: 12000 },
+      { nom: "Phosphatases alcalines", prix: 12000 },
+      { nom: "Bilirubine totale", prix: 15000 },
+      { nom: "Bilirubine directe", prix: 15000 },
+    ],
+    "Bilan lipidique": [
+      { nom: "Cholestérol total", prix: 12000 },
+      { nom: "HDL", prix: 12000 },
+      { nom: "LDL", prix: 12000 },
+      { nom: "Triglycérides", prix: 12000 },
+    ],
+    "Bilan ionique": [
+      { nom: "Sodium", prix: 10000 },
+      { nom: "Potassium", prix: 10000 },
+      { nom: "Chlore", prix: 10000 },
+      { nom: "Calcium", prix: 10000 },
+      { nom: "Magnésium", prix: 12000 },
+      { nom: "Phosphore", prix: 10000 },
+    ],
+    "Bilan pancréatique": [
+      { nom: "Lipase", prix: 20000 },
+      { nom: "Amylase", prix: 18000 },
+    ],
+    "Bilan protéique": [
+      { nom: "Albumine", prix: 15000 },
+      { nom: "Protéines totales", prix: 15000 },
+      { nom: "Ferritine", prix: 25000 },
+      { nom: "CRP", prix: 20000 },
+    ],
+  },
+  "3. IMMUNOLOGIE / SÉROLOGIE": {
+    "Maladies infectieuses": [
+      { nom: "VIH", prix: 20000 },
+      { nom: "Hépatite B", prix: 25000 },
+      { nom: "Hépatite C", prix: 25000 },
+      { nom: "TPHA", prix: 15000 },
+      { nom: "VDRL", price: 15000 },
+      { nom: "Rubéole", prix: 20000 },
+      { nom: "Toxoplasmose", prix: 20000 },
+      { nom: "CMV", prix: 20000 },
+      { nom: "Herpès", prix: 20000 },
+    ],
+    "Auto-immunité": [
+      { nom: "Facteur rhumatoïde", prix: 20000 },
+      { nom: "ASLO", prix: 18000 },
+      { nom: "ANA", prix: 25000 },
+      { nom: "Anti-DNA", prix: 30000 },
+      { nom: "Anti-CCP", prix: 30000 },
+    ],
+    "Allergologie": [
+      { nom: "IgE totales", prix: 25000 },
+      { nom: "IgE spécifiques", prix: 30000 },
+    ],
+  },
+  "4. HORMONOLOGIE": {
+    "Thyroïde": [
+      { nom: "TSH", prix: 20000 },
+      { nom: "T3", prix: 20000 },
+      { nom: "T4", prix: 20000 },
+    ],
+    "Fertilité féminine": [
+      { nom: "FSH", prix: 20000 },
+      { nom: "LH", prix: 20000 },
+      { nom: "Prolactine", prix: 25000 },
+      { nom: "Œstradiol", prix: 25000 },
+      { nom: "Progestérone", prix: 25000 },
+    ],
+    "Fertilité masculine": [
+      { nom: "Testostérone", prix: 25000 },
+      { nom: "FSH", prix: 20000 },
+      { nom: "LH", prix: 20000 },
+    ],
+    "Grossesse": [
+      { nom: "β-HCG", prix: 15000 },
+    ],
+    "Glandes surrénales": [
+      { nom: "Cortisol", prix: 25000 },
+    ],
+  },
+  "5. BACTÉRIOLOGIE": {
+    "Urines": [
+      { nom: "ECBU", prix: 25000 },
+      { nom: "Culture urinaire", prix: 30000 },
+      { nom: "Antibiogramme", prix: 30000 },
+    ],
+    "Selles": [
+      { nom: "Coproculture", prix: 20000 },
+    ],
+    "Sang": [
+      { nom: "Hémoculture", prix: 30000 },
+    ],
+    "Appareil génital": [
+      { nom: "Prélèvement vaginal", prix: 20000 },
+      { nom: "Prélèvement urétral", prix: 20000 },
+      { nom: "Spermoculture", prix: 30000 },
+    ],
+    "Plaies et infections": [
+      { nom: "Culture de pus", prix: 25000 },
+      { nom: "Prélèvement de plaie", prix: 20000 },
+      { nom: "Prélèvement ORL", prix: 20000 },
+    ],
+    "Tuberculose": [
+      { nom: "Recherche de BK", prix: 20000 },
+      { nom: "Culture BK", prix: 35000 },
+    ],
+  },
+  "6. PARASITOLOGIE": {
+    "Paludisme": [
+      { nom: "Goutte épaisse", prix: 15000 },
+      { nom: "Frottis sanguin", prix: 15000 },
+    ],
+    "Parasites intestinaux": [
+      { nom: "KOP", prix: 15000 },
+      { nom: "Examen parasitologique des selles", prix: 20000 },
+      { nom: "Recherche d'amibes", prix: 18000 },
+      { nom: "Recherche de Giardia", prix: 18000 },
+    ],
+    "Parasites urinaires": [
+      { nom: "Bilharziose urinaire", prix: 20000 },
+    ],
+    "Parasites sanguins": [
+      { nom: "Filariose", prix: 20000 },
+      { nom: "Trypanosomiase", prix: 25000 },
+      { nom: "Hémoparasites", prix: 20000 },
+    ],
+    "Autres": [
+      { nom: "Scotch test", prix: 10000 },
+    ],
+  },
+  "7. MYCOLOGIE": {
+    "Champignons cutanés": [
+      { nom: "Examen mycologique peau", prix: 25000 },
+      { nom: "Examen mycologique ongles", prix: 25000 },
+      { nom: "Examen mycologique cheveux", prix: 25000 },
+    ],
+    "Champignons profonds": [
+      { nom: "Recherche Candida", prix: 25000 },
+      { nom: "Recherche Cryptococcus", prix: 30000 },
+    ],
+    "Cultures": [
+      { nom: "Culture fongique", prix: 35000 },
+      { nom: "Antifongigramme", prix: 40000 },
+    ],
+  },
+  "8. MARQUEURS TUMORAUX": {
+    "Cancer de la prostate": [
+      { nom: "PSA total", prix: 30000 },
+      { nom: "PSA libre", prix: 30000 },
+    ],
+    "Cancer du foie": [
+      { nom: "AFP", prix: 35000 },
+    ],
+    "Cancer digestif": [
+      { nom: "CEA", prix: 35000 },
+      { nom: "CA 19-9", prix: 35000 },
+    ],
+    "Cancer du sein": [
+      { nom: "CA 15-3", prix: 40000 },
+    ],
+    "Cancer de l'ovaire": [
+      { nom: "CA 125", prix: 40000 },
+    ],
+    "Autres": [
+      { nom: "NSE", prix: 35000 },
+      { nom: "Calcitonine", prix: 35000 },
+      { nom: "CYFRA 21-1", prix: 35000 },
+      { nom: "Thyroglobuline", prix: 35000 },
+    ],
+  },
+  "9. BIOLOGIE MOLÉCULAIRE": {
+    "PCR infectieuses": [
+      { nom: "PCR VIH", prix: 80000 },
+      { nom: "PCR Hépatite B", prix: 80000 },
+      { nom: "PCR Hépatite C", prix: 80000 },
+      { nom: "PCR COVID-19", prix: 80000 },
+      { nom: "PCR Tuberculose", prix: 80000 },
+      { nom: "PCR HPV", prix: 80000 },
+    ],
+    "Charges virales": [
+      { nom: "Charge virale VIH", prix: 100000 },
+      { nom: "Charge virale Hépatite B", prix: 100000 },
+      { nom: "Charge virale Hépatite C", prix: 100000 },
+    ],
+  },
+  "10. CYTOLOGIE / ANATOMOPATHOLOGIE": {
+    "Cytologie": [
+      { nom: "Frottis cervico-vaginal", prix: 30000 },
+      { nom: "Cytologie urinaire", prix: 25000 },
+      { nom: "Cytologie des liquides biologiques", prix: 30000 },
+    ],
+    "Histologie": [
+      { nom: "Biopsie mammaire", prix: 80000 },
+      { nom: "Biopsie prostatique", prix: 80000 },
+      { nom: "Biopsie gastrique", prix: 80000 },
+      { nom: "Biopsie hépatique", prix: 80000 },
+      { nom: "Biopsie cutanée", prix: 50000 },
+    ],
+  },
+  "11. BANQUE DE SANG": [
+    { nom: "Groupe ABO", prix: 8000 },
+    { nom: "Rhésus", prix: 8000 },
+    { nom: "Phénotypage", prix: 15000 },
+    { nom: "RAI", prix: 20000 },
+    { nom: "Compatibilité transfusionnelle", prix: 25000 },
+    { nom: "Cross Match", prix: 30000 },
   ],
-  "Imagerie": [
-    { nom:"Radiographie pulmonaire", prix:40000 },
-    { nom:"Radiographie abdominale (ASP)", prix:35000 },
-    { nom:"Échographie abdominale", prix:60000 },
-    { nom:"Échographie pelvienne", prix:60000 },
-    { nom:"Échographie obstétricale", prix:70000 },
-    { nom:"Échographie cardiaque (écho cœur)", prix:80000 },
-    { nom:"Scanner (TDM) cérébral", prix:150000 },
-    { nom:"Scanner thoracique", prix:150000 },
-    { nom:"Scanner abdominal", prix:150000 },
-    { nom:"IRM cérébrale", prix:250000 },
-    { nom:"IRM lombaire / colonne", prix:250000 },
+  "IMAGERIE": {
+    "Radiologie": [
+      { nom: "Radiographie pulmonaire", prix: 40000 },
+      { nom: "Radiographie abdominale (ASP)", prix: 35000 },
+      { nom: "Panoramique dentaire", prix: 50000 },
+      { nom: "Radiographie dentaire rétro-alvéolaire", prix: 20000 },
+    ],
+    "Échographie": [
+      { nom: "Échographie abdominale", prix: 60000 },
+      { nom: "Échographie pelvienne", prix: 60000 },
+      { nom: "Échographie obstétricale", prix: 70000 },
+      { nom: "Échographie cardiaque (écho cœur)", prix: 80000 },
+    ],
+    "Scanner (TDM)": [
+      { nom: "Scanner (TDM) cérébral", prix: 150000 },
+      { nom: "Scanner thoracique", prix: 150000 },
+      { nom: "Scanner abdominal", prix: 150000 },
+    ],
+    "IRM": [
+      { nom: "IRM cérébrale", prix: 250000 },
+      { nom: "IRM lombaire / colonne", prix: 250000 },
+    ],
+  },
+  "CARDIOLOGIE": [
+    { nom: "ECG (électrocardiogramme)", prix: 20000 },
+    { nom: "Holter ECG 24h", prix: 80000 },
+    { nom: "Échocardiographie doppler", prix: 100000 },
+    { nom: "Épreuve d'effort", prix: 70000 },
   ],
-  "Cardiologie": [
-    { nom:"ECG (électrocardiogramme)", prix:20000 },
-    { nom:"Holter ECG 24h", prix:80000 },
-    { nom:"Échocardiographie doppler", prix:100000 },
-    { nom:"Épreuve d'effort", prix:70000 },
+  "NEUROLOGIE": [
+    { nom: "EEG (électroencéphalogramme)", prix: 60000 },
+    { nom: "Ponction lombaire", prix: 50000 },
+    { nom: "EMG (électromyogramme)", prix: 80000 },
   ],
-  "Neurologie": [
-    { nom:"EEG (électroencéphalogramme)", prix:60000 },
-    { nom:"Ponction lombaire", prix:50000 },
-    { nom:"EMG (électromyogramme)", prix:80000 },
-  ],
-  "Gynécologie / Obstétrique": [
-    { nom:"Frottis cervico-vaginal (FCV)", prix:30000 },
-    { nom:"Colposcopie", prix:60000 },
-    { nom:"HSG (hystérosalpingographie)", prix:80000 },
-    { nom:"Biopsie endomètre", prix:50000 },
+  "GYNECOLOGIE / OBSTÉTRIQUE": [
+    { nom: "Frottis cervico-vaginal (FCV)", prix: 30000 },
+    { nom: "Colposcopie", prix: 60000 },
+    { nom: "HSG (hystérosalpingographie)", prix: 80000 },
+    { nom: "Biopsie endomètre", prix: 50000 },
   ],
   "ORL": [
-    { nom:"Audiogramme", prix:40000 },
-    { nom:"Tympanogramme", prix:25000 },
-    { nom:"Nasofibroscopie", prix:50000 },
+    { nom: "Audiogramme", prix: 40000 },
+    { nom: "Tympanogramme", prix: 25000 },
+    { nom: "Nasofibroscopie", prix: 50000 },
   ],
-  "Ophtalmologie": [
-    { nom:"Fond d'œil", prix:30000 },
-    { nom:"Champ visuel", prix:40000 },
-    { nom:"Mesure pression oculaire (tonomètrie)", prix:20000 },
-    { nom:"OCT rétine", prix:80000 },
+  "OPHTALMOLOGIE": [
+    { nom: "Fond d'œil", prix: 30000 },
+    { nom: "Champ visuel", prix: 40000 },
+    { nom: "Mesure pression oculaire (tonomètrie)", prix: 20000 },
+    { nom: "OCT rétine", prix: 80000 },
   ],
-  "Dermatologie": [
-    { nom:"Biopsie cutanée", prix:50000 },
-    { nom:"Examen mycologique (champignons)", prix:25000 },
-    { nom:"Dermoscopie", prix:30000 },
+  "DERMATOLOGIE": [
+    { nom: "Biopsie cutanée", prix: 50000 },
+    { nom: "Examen mycologique (champignons)", prix: 25000 },
+    { nom: "Dermoscopie", prix: 30000 },
   ],
-  "Stomatologie / Dentaire": [
-    { nom:"Panoramique dentaire", prix:50000 },
-    { nom:"Radiographie dentaire rétro-alvéolaire", prix:20000 },
-  ],
-  "Oncologie": [
-    { nom:"Biopsie tissulaire (anapath)", prix:80000 },
-    { nom:"Marqueurs tumoraux panel", prix:70000 },
-    { nom:"PET-scan (TEP)", prix:500000 },
-  ],
-  "Maladies infectieuses": [
-    { nom:"Sérologie Hépatite B (AgHBs, Anti-HBs)", prix:25000 },
-    { nom:"Sérologie Hépatite C", prix:25000 },
-    { nom:"PCR COVID-19", prix:80000 },
-    { nom:"Antibiogramme", prix:30000 },
-    { nom:"Frottis sanguin (parasitologie)", prix:15000 },
+  "STOMATOLOGIE / DENTAIRE": [
+    { nom: "Panoramique dentaire", prix: 50000 },
+    { nom: "Radiographie dentaire rétro-alvéolaire", prix: 20000 },
   ],
 }
 

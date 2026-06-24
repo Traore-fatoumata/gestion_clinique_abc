@@ -21,12 +21,14 @@ export default function ModalConsultation({
 
   const dp = consultation?.donneesPrenatal || {}
   const da = consultation?.donneesAccouchement || {}
+  const [observations, setObservations] = useState(consultation?.observations||"")
 
   const [form, setForm] = useState({
     motif:                 consultation?.motif               || patient?.motif || "",
     plaintes:              consultation?.plaintes            || consultation?.observations || "",
     antecedents:           consultation?.antecedents         || "",
     poids:                 consultation?.poids               || "",
+    montantConsultation:   consultation?.montantConsultation ?? patient?.montantConsultation ?? "",
     diagPresomption:       consultation?.diagPresomption     || consultation?.symptomes || "",
     diagDefinitif:         (consultation?.diagDefinitif      || consultation?.diagnostics || []).join(", "),
     pathologies:           (consultation?.pathologies||[]).join(", "),
@@ -44,7 +46,7 @@ export default function ModalConsultation({
 
   const ajouterExamen = (ex) => {
     if (examensCommandes.find(e=>e.nom===ex.nom)) return
-    setExamensCommandes(p=>[...p, { id:Date.now(), nom:ex.nom, prix:ex.prix, categorie:exCat }])
+    setExamensCommandes(p=>[...p, { id:Date.now(), nom:ex.nom, prix: 0, categorie:exCat }])
   }
   const ajouterCustom = () => {
     if (!exCustomNom.trim()) return
@@ -107,6 +109,7 @@ export default function ModalConsultation({
     const data = {
       motif:            form.motif,
       plaintes:         form.plaintes,
+      montantConsultation: form.montantConsultation ? Number(form.montantConsultation) : undefined,
       antecedents:      form.antecedents,
       poids:            form.poids,
       diagPresomption:  form.diagPresomption,
@@ -166,7 +169,7 @@ export default function ModalConsultation({
             <div style={{ background:C.greenSoft, border:"1px solid "+C.green+"33", borderRadius:12, padding:"12px 14px" }}>
               <p style={{ fontSize:11, fontWeight:700, color:C.green, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Transmis par le médecin chef (accueil)</p>
               {patient.plaintesChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Plaintes :</strong> {patient.plaintesChef}</p>}
-              {patient.symptomesChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Symptômes :</strong> {patient.symptomesChef}</p>}
+              {patient.symptomesChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Antécédents :</strong> {patient.symptomesChef}</p>}
               {patient.antecedentsChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Antécédents :</strong> {patient.antecedentsChef}</p>}
               {patient.diagnosticPreliminaireChef && <p style={{ fontSize:13 }}><strong>Diag. présomption :</strong> {patient.diagnosticPreliminaireChef}</p>}
             </div>
@@ -413,6 +416,14 @@ export default function ModalConsultation({
             </div>
           </div>
 
+           <div>
+                          <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.textPri, marginBottom:6 }}>Observations</label>
+                          <input value={observations} onChange={e=>setObservations(e.target.value)}
+                            placeholder="Ex : Etat général, température..."
+                            style={inputSt}
+                        onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border}
+                            />
+                        </div>
           {/* Diagnostic de présomption + suggestions auto */}
           <div>
             <label style={labelSt}>Diagnostic de présomption</label>
@@ -496,7 +507,7 @@ export default function ModalConsultation({
                     return (
                       <button key={ex.nom} type="button" onClick={()=>ajouterExamen(ex)} disabled={!!deja}
                         style={{ padding:"4px 10px", background:deja?C.greenSoft:C.white, color:deja?C.green:C.textPri, border:"1px solid "+(deja?C.green:C.border), borderRadius:20, fontSize:11, fontWeight:600, cursor:deja?"default":"pointer", opacity:deja?.7:1 }}>
-                        {deja&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:4 }}><polyline points="20 6 9 17 4 12"/></svg>}{ex.nom} — {ex.prix.toLocaleString("fr-FR")} GNF
+                        {deja&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:4 }}><polyline points="20 6 9 17 4 12"/></svg>}{ex.nom}
                       </button>
                     )
                   })}
@@ -534,8 +545,9 @@ export default function ModalConsultation({
                         onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
                       <span style={{ fontSize:11, color:C.textMuted, minWidth:30 }}>GNF</span>
                       <button type="button" onClick={()=>supprimerExamen(ex.id)}
-                        style={{ width:28, height:28, borderRadius:6, border:"1px solid "+C.red+"44", background:C.redSoft, color:C.red, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        style={{ width:28, height:28, borderRadius:6, border:"1px solid "+C.red+"44", background:C.redSoft, color:C.red, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}
+                        title="Retirer l'examen">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                     </div>
                   </div>

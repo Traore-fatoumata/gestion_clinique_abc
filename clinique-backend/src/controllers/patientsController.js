@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 // ── Générer un PID unique ────────────────────────────────
 const genPid = async () => {
   const num = Math.floor(100000 + Math.random() * 900000)
-  const pid = `ABC-${num}`
+  const pid = `abc-mar-${num}`
   const { rows } = await pool.query("SELECT id FROM patients WHERE pid = $1", [pid])
   if (rows.length > 0) return genPid() // collision rare → retry
   return pid

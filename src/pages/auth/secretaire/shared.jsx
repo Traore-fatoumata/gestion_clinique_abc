@@ -5,7 +5,7 @@
 // ══════════════════════════════════════════════════════
 export function genId(seed) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"
-  let result = "ABC-", n = seed * 48271 + 1000003
+  let result = "abc-mar-", n = seed * 48271 + 1000003
   for (let i = 0; i < 6; i++) { n = (n*1664525+1013904223)&0x7fffffff; result+=chars[n%chars.length] }
   return result
 }

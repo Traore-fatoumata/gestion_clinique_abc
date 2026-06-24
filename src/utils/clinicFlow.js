@@ -97,3 +97,27 @@ export function buildDonneesBrouillon(data) {
     diagDefinitif:       data.diagDefinitif,
   }
 }
+
+/**
+ * TOUTES les consultations d'un médecin (sans filtre de date).
+ * Utile pour l'historique complet et les consultations en attente de résultats labo.
+ */
+export function toutesConsultationsPourMedecin(consultations, medecinId) {
+  return (consultations || []).filter(c =>
+    Number(c.docteurId) === Number(medecinId)
+  ).sort((a, b) => {
+    // Trier par date décroissante (plus récent en premier)
+    const dateA = a.date || ''
+    const dateB = b.date || ''
+    return dateB.localeCompare(dateA)
+  })
+}
+
+/**
+ * Patients assignés à un médecin (qui ont au moins une consultation en attente ou signée).
+ */
+export function patientsPourMedecin(consultations, patients, medecinId) {
+  const consultsMedecin = toutesConsultationsPourMedecin(consultations, medecinId)
+  const patientIds = [...new Set(consultsMedecin.map(c => Number(c.patientId)))]
+  return (patients || []).filter(p => patientIds.includes(Number(p.id)))
+}

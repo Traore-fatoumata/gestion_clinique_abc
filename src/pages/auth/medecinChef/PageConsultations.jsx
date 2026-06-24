@@ -48,15 +48,15 @@ function ModalConsultationChef({ patient, consultation, medecins, onClose, onVal
                   style={{ ...iSt, resize:"none" }} onFocus={foc} onBlur={blr}/>
               </div>
               <div>
-                <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.textPri, marginBottom:6 }}>Symptômes observés</label>
+                <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.textPri, marginBottom:6 }}>Antécédents du patient</label>
                 <textarea value={symptomes} onChange={e=>setSymptomes(e.target.value)} rows={2}
-                  placeholder="Ex : TA 14/9, Température 38.5°C..."
+                  placeholder="Ex : Hypertension, diabète, allergies..."
                   style={{ ...iSt, resize:"none" }} onFocus={foc} onBlur={blr}/>
               </div>
               <div>
-                <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.textPri, marginBottom:6 }}>Observations / Antécédents</label>
+                <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.textPri, marginBottom:6 }}>Observations</label>
                 <input value={observations} onChange={e=>setObservations(e.target.value)}
-                  placeholder="Ex : Patient hypertendu connu, allergie au pénicilline..."
+                  placeholder="Ex : Etat général, température..."
                   style={iSt} onFocus={foc} onBlur={blr}/>
               </div>
             </div>

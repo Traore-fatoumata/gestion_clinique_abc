@@ -120,6 +120,31 @@ export function SharedDataProvider({ children }) {
     throw new Error(res.message)
   }, [apiFetch])
 
+  const updatePatient = useCallback(async (id, data) => {
+    const res = await apiFetch(`/api/patients/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        nom:            data.nom,
+        date_naissance: data.dateNaissance || null,
+        sexe:           data.sexe || null,
+        telephone:      data.telephone || null,
+        quartier:       data.quartier || null,
+        secteur:        data.secteur || null,
+        profession:     data.profession || null,
+        responsable:    data.responsable || null,
+      }),
+    })
+    if (res.success) {
+      const mappedPatient = {
+        ...res.patient,
+        dateNaissance: res.patient.date_naissance || res.patient.dateNaissance || null,
+      }
+      setPatients(prev => prev.map(p => p.id === id ? mappedPatient : p))
+      return mappedPatient
+    }
+    throw new Error(res.message)
+  }, [apiFetch])
+
   // ── FILE D'ATTENTE ──────────────────────────────────────
   const addToFile = useCallback(async (data) => {
     const montantConsultation = Number.isFinite(data.montantConsultation)
@@ -206,21 +231,22 @@ export function SharedDataProvider({ children }) {
     const res = await apiFetch("/api/consultations", {
       method: "POST",
       body: JSON.stringify({
-        patient_id:        data.patientId,
-        medecin_id:        data.docteurId,
-        date:              data.date,
-        service:           data.service,
-        motif:             data.motif || data.plaintes,
-        plaintes:          data.plaintes,
-        diagnostics:       data.diagnostics || [],
-        traitements:       data.traitements || [],
-        frais_examens:     data.fraisExamens || 0,
-        type_consultation: data.typeConsultation || "standard",
-        examens_commandes: data.examensCommandes || [],
-        signe:             data.signe === true,
-        signe_par:         data.signePar || null,
-        envoyer_labo:      data.envoyerLabo === true,
-        donnees_brouillon: data.donneesBrouillon || buildDonneesBrouillon(data),
+        patient_id:           data.patientId,
+        medecin_id:           data.docteurId,
+        date:                 data.date,
+        service:              data.service,
+        motif:                data.motif || data.plaintes,
+        plaintes:             data.plaintes,
+        diagnostics:          data.diagnostics || [],
+        traitements:          data.traitements || [],
+        frais_examens:        data.fraisExamens || 0,
+        type_consultation:    data.typeConsultation || "standard",
+        examens_commandes:    data.examensCommandes || [],
+        signe:                data.signe === true,
+        signe_par:            data.signePar || null,
+        envoyer_labo:         data.envoyerLabo === true,
+        donnees_brouillon:    data.donneesBrouillon || buildDonneesBrouillon(data),
+        montant_consultation: data.montantConsultation,
       }),
     })
     if (res.success) { await chargerDonnees(); return res.consultationId }
@@ -311,7 +337,7 @@ export function SharedDataProvider({ children }) {
   return (
     <SharedDataContext.Provider value={{
       patients, file, consultations, rdv, notifs, resultatsLabo, soins, loading,
-      addPatient,
+      addPatient, updatePatient,
       addToFile, updateFileEntry,
       addConsultation, updateConsultation, deleteConsultation, signerConsultation,
       addRdv, updateRdv, removeRdv,

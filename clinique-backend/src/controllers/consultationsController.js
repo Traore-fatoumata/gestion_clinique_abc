@@ -127,6 +127,7 @@ const sauvegarderConsultation = async (req, res) => {
     motif, plaintes, diagnostics, traitements,
     frais_examens = 0, type_consultation = "standard",
     examens_commandes, signe, signe_par, envoyer_labo, donnees_brouillon,
+    montant_consultation,
   } = req.body
 
   if (!patient_id || !medecin_id)
@@ -189,16 +190,25 @@ const sauvegarderConsultation = async (req, res) => {
     const consultId = rows[0].id
     let fileId = null
 
-    if (aDesExamens) {
-      const fileRes = await client.query(
-        `SELECT id FROM file_attente
-         WHERE patient_id=$1 AND date_entree=$2 AND statut != 'termine'
-         ORDER BY created_at DESC LIMIT 1`,
-        [patient_id, dateConsult]
-      )
-      if (fileRes.rows.length > 0) {
-        fileId = fileRes.rows[0].id
-        await client.query("DELETE FROM examens_commandes WHERE file_id=$1", [fileId])
+    const fileRes = await client.query(
+      `SELECT id FROM file_attente
+       WHERE patient_id=$1 AND date_entree=$2 AND statut != 'termine'
+       ORDER BY created_at DESC LIMIT 1`,
+      [patient_id, dateConsult]
+    )
+    if (fileRes.rows.length > 0) {
+      fileId = fileRes.rows[0].id
+    }
+
+    if (fileId) {
+      if (montant_consultation !== undefined) {
+        await client.query(
+          "UPDATE file_attente SET montant_consultation=$1, updated_at=NOW() WHERE id=$2",
+          [Number(montant_consultation) || 0, fileId]
+        )
+      }
+      await client.query("DELETE FROM examens_commandes WHERE file_id=$1", [fileId])
+      if (aDesExamens) {
         for (const e of examens_commandes) {
           await client.query(
             `INSERT INTO examens_commandes (file_id, consultation_id, nom, prix)
@@ -206,6 +216,34 @@ const sauvegarderConsultation = async (req, res) => {
             [fileId, consultId, e.nom, e.prix || 0]
           )
         }
+
+        const totalPrix = examens_commandes.reduce((acc, curr) => acc + (Number(curr.prix) || 0), 0)
+        await client.query(
+          `INSERT INTO paiements_examens 
+             (file_id, patient_id, montant_total, montant_paye, statut)
+           VALUES ($1, $2, $3, 0, 'en_attente')
+           ON CONFLICT (file_id) 
+           DO UPDATE SET 
+             montant_total = EXCLUDED.montant_total,
+             statut = CASE 
+               WHEN paiements_examens.montant_paye >= EXCLUDED.montant_total THEN 'paye'::varchar
+               WHEN paiements_examens.montant_paye > 0 THEN 'partiel'::varchar
+               ELSE 'en_attente'::varchar
+             END,
+             updated_at = NOW()`,
+          [fileId, patient_id, totalPrix]
+        )
+      } else {
+        await client.query(
+          `DELETE FROM paiements_examens WHERE file_id = $1 AND montant_paye = 0`,
+          [fileId]
+        )
+        await client.query(
+          `UPDATE paiements_examens 
+           SET montant_total = montant_paye, statut = 'paye', updated_at = NOW() 
+           WHERE file_id = $1`,
+          [fileId]
+        )
       }
     }
 

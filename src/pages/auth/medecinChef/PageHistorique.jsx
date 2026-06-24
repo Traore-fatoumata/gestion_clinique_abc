@@ -1,10 +1,13 @@
 import { useState } from "react"
 import { C, Card, Avatar, StatutBadge } from "./shared.jsx"
+import ModalModifierPatient from "../ModalModifierPatient.jsx"
+import { useSharedData } from "../../../hooks/useSharedData.jsx"
 
 export default function PageHistorique({ consultations, patients, resultatsLabo, soins, rdv }) {
   const [search,     setSearch]     = useState("")
   const [selPatient, setSelPatient] = useState(null)
   const [activeTab,  setActiveTab]  = useState("consultations")
+  const [editPatient, setEditPatient] = useState(null)
 
   const calcAge = dn => {
     if (!dn) return null
@@ -135,7 +138,7 @@ export default function PageHistorique({ consultations, patients, resultatsLabo,
                 <div class="field-val">${val(c.motif)}</div>
               </div>
               <div class="field">
-                <div class="field-lbl">Symptômes</div>
+                <div class="field-lbl">Antécédents du patient</div>
                 <div class="field-val">${arr2str(c.symptomes)}</div>
               </div>
               <div class="field">
@@ -269,10 +272,14 @@ export default function PageHistorique({ consultations, patients, resultatsLabo,
                 {nSoins>0&&<span style={{ background:C.tealSoft,color:C.teal,fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:20 }}>{nSoins} soins</span>}
                 {derniere&&<span style={{ background:C.slateSoft,color:C.slate,fontSize:11,padding:"3px 8px",borderRadius:20 }}>Dernier: {derniere.date}</span>}
               </div>
-              <div style={{ display:"flex",gap:8 }}>
+              <div style={{ display:"flex",gap:6 }}>
                 <button onClick={()=>{ setSelPatient(p); setActiveTab("consultations") }}
-                  style={{ flex:1,padding:"8px",background:C.green,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>
+                  style={{ flex:2,padding:"8px",background:C.green,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>
                   Voir historique
+                </button>
+                <button onClick={()=>{ setEditPatient(p) }}
+                  style={{ flex:1.2,padding:"8px",background:C.blueSoft,color:C.blue,border:"1px solid "+C.blue+"33",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>
+                  Modifier
                 </button>
                 <button onClick={()=>handlePrint(p)} title="Imprimer"
                   style={{ padding:"8px 12px",background:C.white,color:C.textSec,border:"1px solid "+C.border,borderRadius:8,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5 }}>
@@ -289,11 +296,12 @@ export default function PageHistorique({ consultations, patients, resultatsLabo,
 
       {/* ── Modal ── */}
       {selPatient&&(()=>{
-        const age = calcAge(selPatient.dateNaissance)
-        const hist = getConsults(selPatient.id)
-        const labo = getLabo(selPatient.id)
-        const soinsList = getSoins(selPatient.id)
-        const rdvList = getRdv(selPatient.id)
+        const patientData = patients.find(p => p.id === selPatient.id) || selPatient
+        const age = calcAge(patientData.dateNaissance)
+        const hist = getConsults(patientData.id)
+        const labo = getLabo(patientData.id)
+        const soinsList = getSoins(patientData.id)
+        const rdvList = getRdv(patientData.id)
         const payees = hist.filter(c=>c.statut==="paye")
         const totalPaye = payees.reduce((s,c)=>s+(c.montant||0),0)
         return (
@@ -305,14 +313,18 @@ export default function PageHistorique({ consultations, patients, resultatsLabo,
               {/* Header */}
               <div style={{ padding:"18px 22px",borderBottom:"1px solid "+C.border,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
                 <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-                  <Avatar name={selPatient.nom} size={46}/>
+                  <Avatar name={patientData.nom} size={46}/>
                   <div>
-                    <p style={{ fontSize:17,fontWeight:800,color:C.textPri,marginBottom:2 }}>{selPatient.nom}{selPatient.prenom?" "+selPatient.prenom:""}</p>
-                    <p style={{ fontSize:12,color:C.textMuted }}>{selPatient.pid||"—"} · {selPatient.sexe||"N/A"} · {age!==null?age+" ans":"—"} · {selPatient.telephone||"—"}</p>
+                    <p style={{ fontSize:17,fontWeight:800,color:C.textPri,marginBottom:2 }}>{patientData.nom}{patientData.prenom?" "+patientData.prenom:""}</p>
+                    <p style={{ fontSize:12,color:C.textMuted }}>{patientData.pid||"—"} · {patientData.sexe||"N/A"} · {age!==null?age+" ans":"—"} · {patientData.telephone||"—"}</p>
                   </div>
                 </div>
                 <div style={{ display:"flex",gap:8 }}>
-                  <button onClick={()=>handlePrint(selPatient)}
+                  <button onClick={()=>setEditPatient(patientData)}
+                    style={{ display:"flex",alignItems:"center",gap:6,padding:"9px 16px",background:C.blueSoft,color:C.blue,border:"1px solid "+C.blue+"33",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>
+                    Modifier
+                  </button>
+                  <button onClick={()=>handlePrint(patientData)}
                     style={{ display:"flex",alignItems:"center",gap:6,padding:"9px 16px",background:C.green,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>
                     {printIcon} Imprimer
                   </button>
@@ -327,10 +339,10 @@ export default function PageHistorique({ consultations, patients, resultatsLabo,
               <div style={{ padding:"12px 22px",borderBottom:"1px solid "+C.border,background:"#f9fafb",flexShrink:0 }}>
                 <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"4px 16px" }}>
                   {[
-                    ["Date naiss.", selPatient.dateNaissance||(age!==null?age+" ans":"—")],
-                    ["Profession", selPatient.profession||"—"],
-                    ["Quartier",   (selPatient.quartier||"—")+(selPatient.secteur?" · "+selPatient.secteur:"")],
-                    ["Responsable",selPatient.responsable||"—"],
+                    ["Date naiss.", patientData.dateNaissance||(age!==null?age+" ans":"—")],
+                    ["Profession", patientData.profession||"—"],
+                    ["Quartier",   (patientData.quartier||"—")+(patientData.secteur?" · "+patientData.secteur:"")],
+                    ["Responsable",patientData.responsable||"—"],
                   ].map(([lbl,val])=>(
                     <div key={lbl}>
                       <span style={{ fontSize:10,color:C.textMuted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.4px" }}>{lbl}</span>
@@ -490,6 +502,13 @@ export default function PageHistorique({ consultations, patients, resultatsLabo,
           </div>
         )
       })()}
+      {/* ── Modal de modification patient ── */}
+      {editPatient && (
+        <ModalModifierPatient
+          patient={editPatient}
+          onClose={() => setEditPatient(null)}
+        />
+      )}
     </div>
   )
 }

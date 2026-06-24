@@ -6,17 +6,13 @@ import { C, Btn, tarifParAge } from "./shared.jsx"
 //  MODAL — ENREGISTRER NOUVEAU PATIENT (formulaire image)
 // ══════════════════════════════════════════════════════
 export default function ModalNouveauPatient({ onClose, onEnregistrer }) {
-  const { settings } = useClinicSettings()
-  const INIT={ nom:"",prenom:"",age:"",dateNaissance:"",sexe:"F",telephone:"",profession:"",quartier:"",secteur:"",responsable:"",telResponsable:"",montantConsultation:"" }
+  const INIT={ nom:"",prenom:"",age:"",dateNaissance:"",sexe:"F",telephone:"",profession:"",quartier:"",secteur:"",responsable:"",telResponsable:"",montantConsultation:"0" }
   const [form, setForm]=useState(INIT)
   const setF=(k,v)=>setForm(p=>({...p,[k]:v}))
-  const ok=form.nom&&form.prenom&&form.montantConsultation
+  const ok=form.nom&&form.prenom
 
-  // Calcul tarif automatique selon date de naissance
-  const tarifAuto = tarifParAge(form.dateNaissance, settings)
-  // Mise à jour auto du montant quand la date change
   const handleDateNaissance = (val) => {
-    setForm(p=>({ ...p, dateNaissance:val, montantConsultation:tarifParAge(val, settings).toString() }))
+    setForm(p=>({ ...p, dateNaissance:val }))
   }
 
   const iSt={ width:"100%",padding:"13px 16px",fontSize:14,border:"1.5px solid "+C.border,borderRadius:12,background:C.white,color:C.textPri,outline:"none",fontFamily:"inherit" }
@@ -105,52 +101,12 @@ export default function ModalNouveauPatient({ onClose, onEnregistrer }) {
             </div>
           </div>
 
-          {/* FRAIS DE CONSULTATION */}
-          <div>
-            <p style={{ fontSize:11,fontWeight:700,color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:16 }}>Frais de consultation <span style={{ color:C.red }}>*</span></p>
-            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start" }}>
-              <div>
-                <label style={{ display:"block",fontSize:13,fontWeight:500,color:C.textPri,marginBottom:8 }}>
-                  Montant à payer (GNF) <span style={{ color:C.red }}>*</span>
-                </label>
-                <input type="number" value={form.montantConsultation}
-                  onChange={e=>setF("montantConsultation",e.target.value)}
-                  placeholder="Ex : 50000"
-                  style={iSt} onFocus={foc} onBlur={blr}/>
-                <p style={{ fontSize:12,color:C.textMuted,marginTop:6 }}>
-                  Saisir le montant annoncé au patient
-                </p>
-              </div>
-              <div style={{ background:C.greenSoft,borderRadius:14,padding:"16px 18px",border:"1px solid "+C.green+"44" }}>
-                <p style={{ fontSize:11,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10 }}>Tarif selon l'âge</p>
-                {[
-                  { label:"0 – 15 ans", sub:"0 à 15 ans", montant:15000 },
-                  { label:"> 15 ans",    sub:"Plus de 15 ans", montant:20000 },
-                ].map(t=>(
-                  <div key={t.label} onClick={()=>setF("montantConsultation",t.montant.toString())}
-                    style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 8px",borderRadius:8,cursor:"pointer",
-                      background:form.montantConsultation===t.montant.toString()?"#bbf7d0":"transparent",
-                      border:form.montantConsultation===t.montant.toString()?"1px solid "+C.green:"1px solid transparent" }}>
-                    <span style={{ fontSize:12,color:C.textSec }}>{t.label}</span>
-                    <span style={{ fontSize:13,fontWeight:700,color:C.green }}>{t.montant.toLocaleString("fr-FR")} GNF</span>
-                  </div>
-                ))}
-                {form.dateNaissance&&(
-                  <div style={{ marginTop:10,padding:"8px 10px",background:"#fff",borderRadius:10,border:"1px solid "+C.green+"44" }}>
-                    <p style={{ fontSize:12,color:C.textSec }}>Tarif calculé auto :</p>
-                    <p style={{ fontSize:15,fontWeight:800,color:C.green }}>{tarifAuto.toLocaleString("fr-FR")} GNF</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Boutons */}
           <div style={{ display:"flex",justifyContent:"flex-end",gap:12,paddingTop:16,borderTop:"1px solid "+C.border }}>
             <Btn onClick={onClose} variant="secondary">Annuler</Btn>
             <Btn onClick={()=>{ if(ok) onEnregistrer(form) }} disabled={!ok}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              Enregistrer — {form.montantConsultation ? parseInt(form.montantConsultation).toLocaleString("fr-FR")+" GNF à payer" : "Saisir le montant"}
+              Enregistrer le patient
             </Btn>
           </div>
         </div>

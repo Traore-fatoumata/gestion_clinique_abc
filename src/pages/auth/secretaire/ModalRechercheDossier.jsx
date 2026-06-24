@@ -9,7 +9,7 @@ export default function ModalRechercheDossier({ patients, rdvs, onClose, onSigna
   const { settings } = useClinicSettings()
   const [q,           setQ]           = useState("")
   const [selPatient,  setSelPatient]  = useState(null)   // patient sélectionné pour confirmer
-  const [montant,     setMontant]     = useState("")
+  const [montant,     setMontant]     = useState("0")
 
   const resultats = q.length>=2 ? patients.filter(p=>
     p.pid.toLowerCase().includes(q.toLowerCase())||
@@ -19,18 +19,15 @@ export default function ModalRechercheDossier({ patients, rdvs, onClose, onSigna
 
   const iSt={ width:"100%",padding:"12px 14px",fontSize:14,border:"1.5px solid "+C.border,borderRadius:12,background:C.white,color:C.textPri,outline:"none",fontFamily:"inherit" }
 
-  const tarifAuto = tarifParAge(selPatient?.dateNaissance, settings)
-
   const handleSelectionner = (p) => {
     setSelPatient(p)
-    setMontant(tarifParAge(p.dateNaissance, settings).toString())
+    setMontant("0")
   }
 
   const rdvDuJour = selPatient ? rdvs.find(r => r.patientId === selPatient.id && r.date === today()) : null
 
   const handleConfirmer = () => {
-    if (!montant) { alert("Veuillez saisir le montant de consultation."); return }
-    onSignaler(selPatient, parseInt(montant), rdvDuJour)
+    onSignaler(selPatient, 0, rdvDuJour)
     onClose()
   }
 
@@ -56,7 +53,7 @@ export default function ModalRechercheDossier({ patients, rdvs, onClose, onSigna
           {!selPatient && (<>
             <div style={{ position:"relative",marginBottom:16 }}>
               <svg style={{ position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Ex : ABC-A1B2C3 ou Bah Mariama (RDV spécialiste)"
+              <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Ex : abc-mar-123456 ou Bah Mariama (RDV spécialiste)"
                 style={{ ...iSt,paddingLeft:40,background:C.bg }}
                 onFocus={e=>{ e.target.style.borderColor=C.blue; e.target.style.background=C.white }}
                 onBlur={e=>{ e.target.style.borderColor=C.border; e.target.style.background=C.bg }}/>
@@ -94,50 +91,17 @@ export default function ModalRechercheDossier({ patients, rdvs, onClose, onSigna
               </div>
             </div>
 
-            {/* Saisie montant */}
-            <div style={{ marginBottom:16 }}>
-              <label style={{ display:"block",fontSize:13,fontWeight:600,color:C.textPri,marginBottom:8 }}>
-                Montant de consultation à payer (GNF) <span style={{ color:C.red }}>*</span>
-              </label>
-              <input type="number" value={montant} onChange={e=>setMontant(e.target.value)}
-                placeholder="Ex : 50000" style={iSt}
-                onFocus={e=>e.target.style.borderColor=C.blue}
-                onBlur={e=>e.target.style.borderColor=C.border}/>
-            </div>
-
-            {/* Grille tarifaire cliquable */}
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:20 }}>
-              {[
-                { label:"0 – 15 ans", sub:"0 à 15 ans", montant:15000 },
-                { label:"> 15 ans",    sub:"Plus de 15 ans", montant:20000 },
-              ].map(t=>(
-                <div key={t.label} onClick={()=>setMontant(t.montant.toString())}
-                  style={{ padding:"10px 8px",borderRadius:10,border:"2px solid "+(montant===t.montant.toString()?C.green:C.border),
-                    background:montant===t.montant.toString()?C.greenSoft:C.white,cursor:"pointer",textAlign:"center" }}>
-                  <p style={{ fontSize:12,fontWeight:700,color:montant===t.montant.toString()?C.green:C.textPri }}>{t.label}</p>
-                  <p style={{ fontSize:10,color:C.textMuted,marginBottom:4 }}>{t.sub}</p>
-                  <p style={{ fontSize:13,fontWeight:800,color:montant===t.montant.toString()?C.green:C.textSec }}>{t.montant.toLocaleString("fr-FR")} GNF</p>
-                </div>
-              ))}
-            </div>
-
-            {rdvDuJour && (
+             {rdvDuJour && (
               <div style={{ padding:"14px 16px",background:C.purpleSoft,borderRadius:12,border:"1px solid "+C.purple+"22",marginBottom:16 }}>
                 <p style={{ fontSize:13,fontWeight:700,color:C.purple }}>Rendez-vous du jour détecté</p>
                 <p style={{ fontSize:13,color:C.textPri,margin:0 }}>Patient attendu chez {rdvDuJour.docteur} ({rdvDuJour.service}) à {rdvDuJour.heure}.</p>
               </div>
             )}
-            {selPatient.dateNaissance && (
-              <div style={{ padding:"10px 14px",background:C.blueSoft,borderRadius:10,border:"1px solid "+C.blue+"33",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                <span style={{ fontSize:13,color:C.textSec }}>Tarif calculé automatiquement selon l'âge</span>
-                <span style={{ fontSize:14,fontWeight:800,color:C.blue }}>{tarifAuto.toLocaleString("fr-FR")} GNF</span>
-              </div>
-            )}
 
-            <div style={{ display:"flex",gap:10 }}>
+            <div style={{ display:"flex",gap:10,marginTop:16 }}>
               <Btn onClick={()=>setSelPatient(null)} variant="secondary"><span style={{ display:"inline-flex",alignItems:"center",gap:5 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Retour</span></Btn>
-              <Btn onClick={handleConfirmer} disabled={!montant} style={{ flex:1 }}>
-                {rdvDuJour ? `Envoyer au spécialiste ${rdvDuJour.docteur}` : `Signaler au médecin chef`}{montant ? ` — ${parseInt(montant).toLocaleString("fr-FR")} GNF` : ""}
+              <Btn onClick={handleConfirmer} style={{ flex:1 }}>
+                {rdvDuJour ? `Envoyer au spécialiste ${rdvDuJour.docteur}` : `Signaler au médecin chef`}
               </Btn>
             </div>
           </>)}

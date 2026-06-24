@@ -27,6 +27,8 @@ export default function ModalConsultation({
     plaintes:              consultation?.plaintes            || consultation?.observations || "",
     antecedents:           consultation?.antecedents         || "",
     poids:                 consultation?.poids               || "",
+    pouls:                 consultation?.pouls               || "",
+    spo2:                  consultation?.spo2                || "",
     montantConsultation:   consultation?.montantConsultation ?? patient?.montantConsultation ?? "",
     diagPresomption:       consultation?.diagPresomption     || consultation?.symptomes || "",
     diagDefinitif:         (consultation?.diagDefinitif      || consultation?.diagnostics || []).join(", "),
@@ -39,13 +41,33 @@ export default function ModalConsultation({
   const [examensCommandes, setExamensCommandes] = useState(consultation?.examensCommandes || [])
   const [showAddExamen, setShowAddExamen] = useState(false)
   const [exCat, setExCat] = useState(Object.keys(EXAMENS_PAR_CATEGORIE)[0])
+  const [exSousCat, setExSousCat] = useState("")
+   const [observations, setObservations] = useState(consultation?.observations||"")
   const [exCustomNom, setExCustomNom] = useState("")
   const [exCustomPrix, setExCustomPrix] = useState("")
+
+  // Get available exams for current category (handle both flat arrays and nested objects)
+  const getCurrentCategoryExams = () => {
+    const cat = EXAMENS_PAR_CATEGORIE[exCat]
+    if (!cat) return []
+    if (Array.isArray(cat)) return { sousCats: null, examens: cat }
+    // Nested structure with subcategories
+    const sousCats = Object.keys(cat)
+    const selectedSousCat = exSousCat || sousCats[0]
+    if (!exSousCat && sousCats.length > 0) setExSousCat(sousCats[0])
+    return {
+      sousCats,
+      selectedSousCat: exSousCat || sousCats[0],
+      examens: cat[exSousCat || sousCats[0]] || []
+    }
+  }
+
   const fraisExamens = examensCommandes.reduce((s,e)=>s+(parseInt(e.prix)||0),0)
 
   const ajouterExamen = (ex) => {
     if (examensCommandes.find(e=>e.nom===ex.nom)) return
-    setExamensCommandes(p=>[...p, { id:Date.now(), nom:ex.nom, prix: prixExamensParLabo ? 0 : ex.prix, categorie:exCat }])
+    const catLabel = exSousCat ? `${exCat} - ${exSousCat}` : exCat
+    setExamensCommandes(p=>[...p, { id:Date.now(), nom:ex.nom, prix: ex.prix || 0, categorie:catLabel }])
   }
   const ajouterCustom = () => {
     if (!exCustomNom.trim()) return
@@ -111,6 +133,8 @@ export default function ModalConsultation({
       montantConsultation: form.montantConsultation ? Number(form.montantConsultation) : undefined,
       antecedents:      form.antecedents,
       poids:            form.poids,
+      pouls:            form.pouls,
+      spo2:             form.spo2,
       diagPresomption:  form.diagPresomption,
       diagDefinitif:    parseList(form.diagDefinitif),
       diagnostics:      parseList(form.diagDefinitif),
@@ -168,7 +192,7 @@ export default function ModalConsultation({
             <div style={{ background:C.greenSoft, border:"1px solid "+C.green+"33", borderRadius:12, padding:"12px 14px" }}>
               <p style={{ fontSize:11, fontWeight:700, color:C.green, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Transmis par le médecin chef (accueil)</p>
               {patient.plaintesChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Plaintes :</strong> {patient.plaintesChef}</p>}
-              {patient.symptomesChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Symptômes :</strong> {patient.symptomesChef}</p>}
+              {patient.symptomesChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Antécédents :</strong> {patient.symptomesChef}</p>}
               {patient.antecedentsChef && <p style={{ fontSize:13, marginBottom:4 }}><strong>Antécédents :</strong> {patient.antecedentsChef}</p>}
               {patient.diagnosticPreliminaireChef && <p style={{ fontSize:13 }}><strong>Diag. présomption :</strong> {patient.diagnosticPreliminaireChef}</p>}
             </div>
@@ -399,8 +423,8 @@ export default function ModalConsultation({
               onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
           </div>
 
-          {/* Antécédents + Poids */}
-          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:14 }}>
+          {/* Antécédents + Signes vitaux */}
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:14 }}>
             <div>
               <label style={labelSt}>Antécédents du patient</label>
               <textarea value={form.antecedents} onChange={e=>f("antecedents",e.target.value)}
@@ -413,15 +437,28 @@ export default function ModalConsultation({
                 style={{ ...inputSt, resize:"none" }}
                 onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
             </div>
+            <div>
+              <label style={labelSt}>Pouls (bpm)</label>
+              <input type="number" value={form.pouls} onChange={e=>f("pouls",e.target.value)} placeholder="Ex : 72"
+                style={{ ...inputSt, resize:"none" }}
+                onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
+            </div>
+            <div>
+              <label style={labelSt}>SpO₂ (%)</label>
+              <input type="number" value={form.spo2} onChange={e=>f("spo2",e.target.value)} placeholder="Ex : 98" min="0" max="100"
+                style={{ ...inputSt, resize:"none" }}
+                onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
+            </div>
           </div>
 
-          {/* Montant consultation — modifiable par le médecin */}
-          <div>
-            <label style={labelSt}>Montant de la consultation (GNF)</label>
-            <input type="number" value={form.montantConsultation} onChange={e=>f("montantConsultation", e.target.value)} placeholder="Laisser vide pour tarif par défaut"
-              style={{ ...inputSt }} onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border} />
-          </div>
-
+         <div>
+                <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.textPri, marginBottom:6 }}>Observations</label>
+                <input value={observations} onChange={e=>setObservations(e.target.value)}
+                  placeholder="Ex : Etat général, température..."
+                  style={inputSt}
+              onFocus={e=>e.target.style.borderColor=C.blue} onBlur={e=>e.target.style.borderColor=C.border}
+                  />
+              </div>
           {/* Diagnostic de présomption + suggestions auto */}
           <div>
             <label style={labelSt}>Diagnostic de présomption</label>
@@ -493,27 +530,37 @@ export default function ModalConsultation({
             </div>
 
             {/* Panneau d'ajout */}
-            {showAddExamen && (
-              <div style={{ padding:"14px 18px", background:"#f9fafb", borderBottom:"1px solid "+C.border }}>
-                <div style={{ display:"flex", gap:10, marginBottom:12, flexWrap:"wrap" }}>
-                  <select value={exCat} onChange={e=>setExCat(e.target.value)}
-                    style={{ ...inputSt, flex:"1 1 180px", padding:"8px 12px", fontSize:12 }}>
-                    {Object.keys(EXAMENS_PAR_CATEGORIE).map(cat=>(
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:14 }}>
-                  {EXAMENS_PAR_CATEGORIE[exCat]?.map(ex=>{
-                    const deja = examensCommandes.find(e=>e.nom===ex.nom)
-                    return (
-                      <button key={ex.nom} type="button" onClick={()=>ajouterExamen(ex)} disabled={!!deja}
-                        style={{ padding:"4px 10px", background:deja?C.greenSoft:C.white, color:deja?C.green:C.textPri, border:"1px solid "+(deja?C.green:C.border), borderRadius:20, fontSize:11, fontWeight:600, cursor:deja?"default":"pointer", opacity:deja?.7:1 }}>
-                        {deja&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:4 }}><polyline points="20 6 9 17 4 12"/></svg>}{ex.nom}{!prixExamensParLabo && ` — ${ex.prix.toLocaleString("fr-FR")} GNF`}
-                      </button>
-                    )
-                  })}
-                </div>
+            {showAddExamen && (() => {
+              const catData = getCurrentCategoryExams()
+              return (
+                <div style={{ padding:"14px 18px", background:"#f9fafb", borderBottom:"1px solid "+C.border }}>
+                  <div style={{ display:"flex", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+                    <select value={exCat} onChange={e=>{ setExCat(e.target.value); setExSousCat("") }}
+                      style={{ ...inputSt, flex:"1 1 180px", padding:"8px 12px", fontSize:12 }}>
+                      {Object.keys(EXAMENS_PAR_CATEGORIE).map(cat=>(
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    {catData.sousCats && catData.sousCats.length > 0 && (
+                      <select value={exSousCat || catData.sousCats[0]} onChange={e=>setExSousCat(e.target.value)}
+                        style={{ ...inputSt, flex:"1 1 180px", padding:"8px 12px", fontSize:12 }}>
+                        {catData.sousCats.map(sc=>(
+                          <option key={sc} value={sc}>{sc}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:14 }}>
+                    {catData.examens.map(ex=>{
+                      const deja = examensCommandes.find(e=>e.nom===ex.nom)
+                      return (
+                        <button key={ex.nom} type="button" onClick={()=>ajouterExamen(ex)} disabled={!!deja}
+                          style={{ padding:"4px 10px", background:deja?C.greenSoft:C.white, color:deja?C.green:C.textPri, border:"1px solid "+(deja?C.green:C.border), borderRadius:20, fontSize:11, fontWeight:600, cursor:deja?"default":"pointer", opacity:deja?.7:1 }}>
+                          {deja&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:4 }}><polyline points="20 6 9 17 4 12"/></svg>}{ex.nom}
+                        </button>
+                      )
+                    })}
+                  </div>
                 <div style={{ borderTop:"1px dashed "+C.border, paddingTop:12 }}>
                   <p style={{ fontSize:11, fontWeight:700, color:C.textSec, marginBottom:8 }}>Examen personnalisé</p>
                   <div style={{ display:"flex", gap:8 }}>
@@ -532,7 +579,8 @@ export default function ModalConsultation({
                   </div>
                 </div>
               </div>
-            )}
+              )
+            })()}
 
             {/* Liste des examens commandés */}
             {examensCommandes.length > 0 && (
@@ -553,8 +601,9 @@ export default function ModalConsultation({
                       <span style={{ fontSize:11, color:C.textMuted, minWidth:30 }}>GNF</span>
                       </>}
                       <button type="button" onClick={()=>supprimerExamen(ex.id)}
-                        style={{ width:28, height:28, borderRadius:6, border:"1px solid "+C.red+"44", background:C.redSoft, color:C.red, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        style={{ width:28, height:28, borderRadius:6, border:"1px solid "+C.red+"44", background:C.redSoft, color:C.red, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}
+                        title="Retirer l'examen">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                     </div>
                   </div>
