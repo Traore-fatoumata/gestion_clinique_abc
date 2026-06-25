@@ -1,0 +1,145 @@
+/**
+ * ═══════════════════════════════════════════════════════════
+ *  ONCOLOGIE — Constantes & Examens spécifiques
+ *  ═══════════════════════════════════════════════════════════
+ */
+
+export const EXAMENS_ONCO = {
+  "Marqueurs tumoraux": [
+    "ACE (Antigène Carcino-Embryonnaire)",
+    "CA 15-3",
+    "CA 125",
+    "CA 19-9",
+    "AFP (Alpha-Foetoprotéine)",
+    "PSA total",
+    "PSA libre",
+    "NSE (Neuron Specific Enolase)",
+    "CYFRA 21-1",
+    "SCC (Squamous Cell Carcinoma)",
+    "Calcitonine",
+    "Thyroglobuline",
+    "Bêta-HCG",
+    "LDH",
+    "Bêta-2-microglobuline",
+  ],
+  "Imagerie oncologique": [
+    "TEP-scanner (FDG-PET)",
+    "Scanner thoraco-abdomino-pelvien",
+    "IRM mammaire",
+    "IRM prostatique",
+    "IRM hépatique",
+    "Scintigraphie osseuse",
+    "Échographie thyroïdienne",
+    "Mammographie",
+  ],
+  "Anatomopathologie": [
+    "Biopsie",
+    "Examen extemporané",
+    "Immunohistochimie",
+    "Analyse moléculaire",
+    "Caryotype",
+    "FISH (Fluorescence In Situ Hybridization)",
+    "Séquençage génétique",
+    "Test PD-L1",
+  ],
+  "Examens endoscopiques": [
+    "Gastroscopie avec biopsie",
+    "Coloscopie avec biopsie",
+    "Bronchoscopie avec biopsie",
+    "Cystoscopie avec biopsie",
+    "Médiastinoscopie",
+  ],
+  "Bilan biologique": [
+    "NFS",
+    "Bilan hépatique",
+    "Bilan rénal",
+    "Ionogramme",
+    "Calcium",
+    "Phosphore",
+    "Albumine",
+    "Protéines totales",
+    "Électrophorèse des protéines",
+  ],
+  "Génétique oncologique": [
+    "Recherche mutation BRCA1/BRCA2",
+    "Recherche mutation EGFR",
+    "Recherche mutation KRAS",
+    "Recherche mutation BRAF",
+    "Test MSI (MicroSatellite Instability)",
+  ],
+}
+
+export const SYMPTOMES_ONCO = [
+  "Masse suspecte",
+  "Gonflement",
+  "Douleur persistante",
+  "Perte de poids inexpliquée",
+  "Fatigue anormale",
+  "Fièvre inexpliquée",
+  "Sueurs nocturnes",
+  "Saignements anormaux",
+  "Toux persistante",
+  "Difficulté à avaler",
+  "Modification du transit",
+  "Modification d'un grain de beauté",
+  "Ulceration qui ne guérit pas",
+  "Enrouement persistant",
+  "Gonflement des ganglions",
+]
+
+export const PATHOLOGIES_ONCO = [
+  "Cancer du sein",
+  "Cancer du poumon",
+  "Cancer colorectal",
+  "Cancer de la prostate",
+  "Cancer de l'estomac",
+  "Cancer du pancréas",
+  "Cancer du foie",
+  "Cancer de l'ovaire",
+  "Cancer de l'utérus",
+  "Cancer du col de l'utérus",
+  "Cancer de la thyroïde",
+  "Cancer de la vessie",
+  "Cancer du rein",
+  "Mélanome",
+  "Lymphome",
+  "Leucémie",
+  "Myélome multiple",
+  "Sarcome",
+  "Tumeur cérébrale",
+  "Cancer ORL",
+  "Cancer de l'œsophage",
+  "Cancer des voies biliaires",
+  "Cancer du testicule",
+  "Cancer de la peau",
+]
+
+export const TRAITEMENTS_ONCO = [
+  "Chimiothérapie",
+  "Radiothérapie",
+  "Chirurgie",
+  "Immunothérapie",
+  "Hormonothérapie",
+  "Thérapie ciblée",
+  "Greffe de moelle",
+  "Inhibiteurs de tyrosine kinase",
+  "Anticorps monoclonaux",
+  "Inhibiteurs de PARP",
+  "Inhibiteurs de checkpoint",
+  "Thérapie photodynamique",
+  "Embolisation",
+  "Ablation par radiofréquence",
+  "Cryothérapie",
+  "Soins de support",
+  "Traitement de la douleur",
+  "Soins palliatifs",
+]
+
+export const C_ONCO = {
+  primary: "#7c3aed",
+  primarySoft: "#f5f3ff",
+  secondary: "#6d28d9",
+  border: "#ddd6fe",
+}
+
+export default { EXAMENS_ONCO, SYMPTOMES_ONCO, PATHOLOGIES_ONCO, TRAITEMENTS_ONCO, C_ONCO }

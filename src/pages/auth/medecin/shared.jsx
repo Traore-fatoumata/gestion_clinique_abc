@@ -7,6 +7,13 @@ export const today   = () => new Date().toISOString().slice(0, 10)
 export const fmt     = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—"
 export const calcAge = d => { if (!d) return 0; return Math.floor((Date.now() - new Date(d)) / (365.25 * 864e5)) }
 
+/** Vérifie si la spécialité est gynécologie/obstétrique */
+export const isGynecoObst = (specialite) => {
+  if (!specialite) return false
+  const s = specialite.toLowerCase()
+  return s.includes("gynéco") || s.includes("gyneco") || s.includes("obstétrique") || s.includes("obstetrique") || s.includes("gynécologie")
+}
+
 // ══════════════════════════════════════════════════════
 //  DONNÉES
 // ══════════════════════════════════════════════════════
@@ -119,8 +126,6 @@ export const TYPE_CONSULT_LABEL = {
   prenatal:     { label:"Consultation prénatale (CPN)", short:"CPN"      },
   accouchement: { label:"Registre d'accouchement",      short:"Accouch." },
 }
-
-export const isGynecoObst = (sp) => /gynécologie|obstétrique/i.test(sp || "")
 
 
 

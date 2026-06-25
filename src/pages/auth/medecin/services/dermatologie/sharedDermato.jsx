@@ -1,0 +1,141 @@
+/**
+ * ═══════════════════════════════════════════════════════════
+ *  DERMATOLOGIE — Constantes & Examens spécifiques
+ *  ═══════════════════════════════════════════════════════════
+ */
+
+export const EXAMENS_DERMATO = {
+  "Examens cliniques": [
+    "Examen dermatologique complet",
+    "Dermoscopie",
+    "Photographie médicale",
+    "Cartographie des grains de beauté",
+    "Examen des muqueuses",
+    "Examen des phanères",
+  ],
+  "Examens de laboratoire": [
+    "Prélèvement mycologique",
+    "Prélèvement bactériologique",
+    "Prélèvement virologique",
+    "Examen direct",
+    "Culture bactérienne",
+    "Culture fongique",
+    "Recherche de sarcopte",
+    "Biopsie cutanée",
+    "Anatomopathologie",
+  ],
+  "Tests allergologiques": [
+    "Prick tests",
+    "Intradermoréactions",
+    "Patch tests",
+    "Phototests",
+    "Test de provocation",
+  ],
+  "Imagerie": [
+    "Échographie cutanée",
+    "Microscopie confocale",
+    "Tomographie par cohérence optique",
+    "Photographie par fluorescence",
+  ],
+  "Examens spécialisés": [
+    "Bilan immunologique",
+    "Recherche d'anticorps anti-peau",
+    "Immunofluorescence directe",
+    "Immunofluorescence indirecte",
+    "Caryotype",
+  ],
+}
+
+export const SYMPTOMES_DERMATO = [
+  "Éruption cutanée",
+  "Rougeurs",
+  "Démangeaisons",
+  "Brûlures",
+  "Douleurs",
+  "Desquamation",
+  "Croûtes",
+  "Vésicules",
+  "Bulles",
+  "Pustules",
+  "Nodules",
+  "Tumeurs",
+  "Ulcérations",
+  "Chute de cheveux",
+  "Ongles cassants",
+  "Ongles décolorés",
+  "Taches pigmentées",
+  "Grains de beauté suspects",
+  "Gonflement",
+  "Saignements",
+]
+
+export const PATHOLOGIES_DERMATO = [
+  "Acné",
+  "Eczéma",
+  "Dermatite atopique",
+  "Dermatite de contact",
+  "Psoriasis",
+  "Urticaire",
+  "Mycoses cutanées",
+  "Mycoses des ongles",
+  "Candidose",
+  "Herpès",
+  "Zona",
+  "Verrues",
+  "Molluscum",
+  "Impétigo",
+  "Folliculite",
+  "Furoncle",
+  "Abcès",
+  "Cellulite",
+  "Gale",
+  "Poux",
+  "Rosacée",
+  "Vitiligo",
+  "Mélasma",
+  "Lentigos",
+  "Kératose",
+  "Cancer de la peau",
+  "Mélanome",
+  "Carcinome basocellulaire",
+  "Carcinome spinocellulaire",
+  "Lupus érythémateux",
+  "Sclérodermie",
+  "Pemphigus",
+  "Alopécie",
+  "Hyperhidrose",
+]
+
+export const TRAITEMENTS_DERMATO = [
+  "Crèmes corticoïdes",
+  "Crèmes antibiotiques",
+  "Crèmes antifongiques",
+  "Crèmes antivirales",
+  "Émollients",
+  "Kératolytiques",
+  "Rétinoïdes",
+  "Immunosuppresseurs",
+  "Antihistaminiques",
+  "Antibiotiques oraux",
+  "Antifongiques oraux",
+  "Antiviraux oraux",
+  "Corticoïdes oraux",
+  "Méthotrexate",
+  "Biothérapies",
+  "Photothérapie",
+  "Cryothérapie",
+  "Électrocoagulation",
+  "Laser",
+  "Chirurgie de Mohs",
+  "Exérèse",
+  "Greffe cutanée",
+]
+
+export const C_DERMATO = {
+  primary: "#f97316",
+  primarySoft: "#fff7ed",
+  secondary: "#ea580c",
+  border: "#fed7aa",
+}
+
+export default { EXAMENS_DERMATO, SYMPTOMES_DERMATO, PATHOLOGIES_DERMATO, TRAITEMENTS_DERMATO, C_DERMATO }

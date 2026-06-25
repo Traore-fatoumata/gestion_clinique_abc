@@ -1,0 +1,185 @@
+/**
+ * ═══════════════════════════════════════════════════════════
+ *  ORL — Constantes & Examens spécifiques
+ *  ═══════════════════════════════════════════════════════════
+ */
+
+// Examens spécifiques à l'ORL
+export const EXAMENS_ORL = {
+  "Examens de l'audition": [
+    "Audiométrie tonale",
+    "Audiométrie vocale",
+    "Audiométrie infantile",
+    "Impédancemétrie",
+    "Tympanométrie",
+    "Réflexes stapédiens",
+    "Otoémissions acoustiques",
+    "Potentiels évoqués auditifs (PEA)",
+    "Auditory Brainstem Response (ABR)",
+    "Test de Rinne",
+    "Test de Weber",
+  ],
+  "Examens du vestibule": [
+    "Videonystagmographie",
+    "Vidéonystagmoscopie",
+    "Test de Head Impulse",
+    "Posturographie",
+    "Test calorique",
+    "Test rotationnel",
+    "VEMP (Vestibular Evoked Myogenic Potential)",
+  ],
+  "Examens endoscopiques": [
+    "Nasofibroscopie",
+    "Laryngoscopie",
+    "Nasofibrolaryngoscopie",
+    "Otoscopie",
+    "Micro-otoscopie",
+    "Pharyngoscopie",
+    "Rhinoscopie",
+  ],
+  "Imagerie ORL": [
+    "Scanner des rochers",
+    "Scanner des sinus",
+    "Scanner du larynx",
+    "IRM des conduits auditifs internes",
+    "IRM de l'angle ponto-cérébelleux",
+    "IRM des sinus",
+    "Échographie cervicale",
+  ],
+  "Examens fonctionnels": [
+    "Rhinomanométrie",
+    "Test de perméabilité nasale",
+    "Exploration de la déglutition",
+    "Vidéofluoroscopie de la déglutition",
+    "Analyse vocale",
+    "Stroboscopie laryngée",
+  ],
+  "Bilan allergologique ORL": [
+    "Tests cutanés (prick tests)",
+    "Tests intradermiques",
+    "Dosage des IgE spécifiques",
+    "Test de provocation nasale",
+  ],
+  "Bilan biologique": [
+    "Prélèvement bactériologique d'oreille",
+    "Prélèvement de gorge",
+    "Prélèvement nasal",
+    "Recherche de streptocoque",
+    "Recherche de staphylocoque",
+    "Recherche d'H. influenzae",
+    "Recherche de pneumocoque",
+  ],
+}
+
+// Symptômes spécifiques ORL
+export const SYMPTOMES_ORL = [
+  "Douleur d'oreille (otalgie)",
+  "Écoulement d'oreille (otorrhée)",
+  "Baisse de l'audition",
+  "Surdité",
+  "Acouphènes",
+  "Vertiges",
+  "Troubles de l'équilibre",
+  "Nez bouché",
+  "Écoulement nasal",
+  "Perte de l'odorat",
+  "Éternuements",
+  "Démangeaisons du nez",
+  "Saignements de nez (épistaxis)",
+  "Douleur de la gorge",
+  "Difficulté à avaler",
+  "Enrouement",
+  "Perte de la voix",
+  "Toux",
+  "Ronflements",
+  "Apnée du sommeil",
+  "Sensation de boule dans la gorge",
+  "Gonflement du cou",
+  "Douleur de la face",
+  "Maux de tête",
+]
+
+// Pathologies courantes en ORL
+export const PATHOLOGIES_ORL = [
+  "Otite moyenne aiguë",
+  "Otite externe",
+  "Otite séromuqueuse",
+  "Perforation du tympan",
+  "Cholestéatome",
+  "Otospongiose",
+  "Surdité de perception",
+  "Surdité de transmission",
+  "Presbyacousie",
+  "Acouphènes",
+  "Maladie de Ménière",
+  "Névrite vestibulaire",
+  "Vertige positionnel paroxystique bénin (VPPB)",
+  "Sinusite aiguë",
+  "Sinusite chronique",
+  "Rhinite allergique",
+  "Rhinite vasomotrice",
+  "Polypes nasaux",
+  "Déviation de la cloison nasale",
+  "Épistaxis",
+  "Angine",
+  "Pharyngite",
+  "Laryngite",
+  "Amygdalite",
+  "Apnée du sommeil",
+  "Ronflements",
+  "Cancer du larynx",
+  "Cancer des voies aérodigestives supérieures",
+  "Cancer du nasopharynx",
+  "Paralysie des cordes vocales",
+  "Nodule des cordes vocales",
+  "Polype des cordes vocales",
+  "Dysphonie",
+  "Corps étranger ORL",
+]
+
+// Traitements courants en ORL
+export const TRAITEMENTS_ORL = [
+  "Antibiotiques",
+  "Anti-inflammatoires",
+  "Corticoïdes",
+  "Antihistaminiques",
+  "Décongestionnants",
+  "Mucolytiques",
+  "Gouttes auriculaires",
+  "Spray nasal",
+  "Lavage de nez",
+  "Aérosols",
+  "Myringotomie",
+  "Pose de drains transtympaniques",
+  "Tympanoplastie",
+  "Mastoïdectomie",
+  "Septoplastie",
+  "Turbinectomie",
+  "Polypectomie",
+  "Amygdalectomie",
+  "Adénoïdectomie",
+  "Uvulopalatopharyngoplastie",
+  "Laryngoscopie",
+  "Cordectomie",
+  "Thyroplastie",
+  "Curage ganglionnaire",
+  "Rééducation orthophonique",
+  "Appareillage auditif",
+  "Implant cochléaire",
+]
+
+// Couleurs spécifiques
+export const C_ORL = {
+  primary: "#0891b2",     // Cyan ORL
+  primarySoft: "#ecfeff",
+  secondary: "#0e7490",
+  border: "#a5f3fc",
+}
+
+export default {
+  EXAMENS_ORL,
+  SYMPTOMES_ORL,
+  PATHOLOGIES_ORL,
+  TRAITEMENTS_ORL,
+  C_ORL,
+}

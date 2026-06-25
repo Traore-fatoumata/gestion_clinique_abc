@@ -3,7 +3,7 @@ import logo from "../../assets/images/logo.jpeg"
 import { useAuth } from "../../hooks/useAuth.jsx"
 import { useNavigate } from "react-router-dom"
 import { useSharedData } from "../../hooks/useSharedData.jsx"
-import { C, today, fmt, calcAge, Avatar, Badge, Btn, Card, CardHeader, RdvBadge, TypeConsultBadge, TYPE_CONSULT_LABEL } from "./medecin/shared.jsx"
+import { C, today, fmt, calcAge, Avatar, Badge, Btn, Card, CardHeader, RdvBadge, TypeConsultBadge, TYPE_CONSULT_LABEL, isGynecoObst } from "./medecin/shared.jsx"
 import ModalFichePatient from "./medecin/ModalFichePatient.jsx"
 import ModalConsultation from "./medecin/ModalConsultation.jsx"
 import ModalCreerRdvMedecin from "./medecin/ModalCreerRdvMedecin.jsx"
@@ -423,6 +423,7 @@ export default function DashboardMedecin() {
   const [mFiche,       setMFiche]       = useState(null)
   const [mConsult,     setMConsult]     = useState(null)
   const [mOrdonnance,  setMOrdonnance]  = useState(null)
+  const [showTypeConsult, setShowTypeConsult] = useState(null) // patient pour afficher le sélecteur
 
   /* Sync consultation ouverte quand les données changent */
   useEffect(() => {
@@ -504,6 +505,8 @@ export default function DashboardMedecin() {
       (TYPE_CONSULT_LABEL[p.typeConsultation]?.label || "").toLowerCase().includes(q)
   })
 
+  const isGyn = isGynecoObst(medecin.specialite)
+
   const ouvrirConsultation = (patient) => {
     const todayStr = today()
     const existing = patient.consultation || consultations.find(c =>
@@ -512,7 +515,22 @@ export default function DashboardMedecin() {
       Number(c.docteurId) === Number(medecin.id) &&
       !c.signe
     )
+
+    // Si gynécologue et pas de consultation existante, afficher le sélecteur
+    if (isGyn && !existing && !patient.typeConsultation) {
+      setShowTypeConsult(patient)
+      return
+    }
+
     setMConsult({ patient, consultation: existing || null })
+  }
+
+  const choisirTypeConsult = (type) => {
+    const patient = showTypeConsult
+    setShowTypeConsult(null)
+    // Mettre à jour le patient avec le typeConsultation
+    const patientAvecType = { ...patient, typeConsultation: type }
+    setMConsult({ patient: patientAvecType, consultation: null })
   }
 
   const handleSauvegarder = async (data) => {
@@ -629,6 +647,142 @@ export default function DashboardMedecin() {
           onCreate={handleCreerRdv}
         />
       )}
+      {/* ── MODAL SELECTEUR TYPE CONSULTATION (Gynécologie) ── */}
+      {showTypeConsult && (
+        <div
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(15,23,42,0.55)",
+            zIndex: 300,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowTypeConsult(null) }}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 480,
+              boxShadow: "0 25px 60px rgba(0,0,0,0.22)",
+              margin: "auto",
+            }}
+          >
+            <div
+              style={{
+                padding: "24px 28px 18px",
+                background: "linear-gradient(135deg,#d946ef,#c026d3)",
+                borderRadius: "20px 20px 0 0",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}
+            >
+              <div>
+                <p style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 3 }}>
+                  Type de consultation
+                </p>
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
+                  {showTypeConsult.nom} · {calcAge(showTypeConsult.dateNaissance)} ans
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTypeConsult(null)}
+                style={{
+                  background: "rgba(255,255,255,0.18)", border: "none",
+                  borderRadius: 8, color: "#fff", cursor: "pointer",
+                  width: 32, height: 32,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 20, lineHeight: 1,
+                }}
+              >×</button>
+            </div>
+
+            <div style={{ padding: "24px 28px" }}>
+              <p style={{ fontSize: 13, color: C.textSec, marginBottom: 16, lineHeight: 1.5 }}>
+                En tant que gynécologue, veuillez sélectionner le type de consultation pour cette patiente :
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <button
+                  onClick={() => choisirTypeConsult("standard")}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 14,
+                    padding: "16px 18px", border: "2px solid " + C.border,
+                    borderRadius: 14, background: C.white, cursor: "pointer",
+                    textAlign: "left", transition: "all .2s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.slate; e.currentTarget.style.background = C.slateSoft }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = C.white }}
+                >
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: C.blueSoft, color: C.blue,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4.8 2.3A.3.3 0 0 0 5 2h14a.3.3 0 0 1 .3.3v19.4a.3.3 0 0 1-.3.3H5a.3.3 0 0 1-.3-.3V2.3z"/><path d="M8 7h8"/><path d="M8 11h6"/><path d="M8 15h8"/><path d="M8 19h4"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri, marginBottom: 3 }}>Consultation standard</p>
+                    <p style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.4 }}>Consultation gynécologique classique (frottis, contraception, troubles menstruels, etc.)</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => choisirTypeConsult("prenatal")}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 14,
+                    padding: "16px 18px", border: "2px solid " + C.border,
+                    borderRadius: 14, background: C.white, cursor: "pointer",
+                    textAlign: "left", transition: "all .2s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.green; e.currentTarget.style.background = C.greenSoft }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = C.white }}
+                >
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: C.greenSoft, color: C.green,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri, marginBottom: 3 }}>Consultation Prénatale (CPN)</p>
+                    <p style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.4 }}>Suivi de grossesse — DDR, terme, HU, BCF, VAT, PTME, etc.</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => choisirTypeConsult("accouchement")}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 14,
+                    padding: "16px 18px", border: "2px solid " + C.border,
+                    borderRadius: 14, background: C.white, cursor: "pointer",
+                    textAlign: "left", transition: "all .2s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.amber; e.currentTarget.style.background = C.amberSoft }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = C.white }}
+                >
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: C.amberSoft, color: C.amber,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri, marginBottom: 3 }}>Accouchement</p>
+                    <p style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.4 }}>Enregistrement de l'accouchement — voie, APGAR, poids nouveau-né, etc.</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {mConsult && (
         <ModalConsultation
           key={mConsult.patient.id + "-" + (mConsult.consultation?.id || "nouveau")}

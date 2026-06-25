@@ -1,0 +1,141 @@
+/**
+ * ═══════════════════════════════════════════════════════════
+ *  CHIRURGIE — Constantes & Examens spécifiques
+ *  ═══════════════════════════════════════════════════════════
+ */
+
+export const EXAMENS_CHIR = {
+  "Bilan pré-opératoire": [
+    "NFS (Numération Formule Sanguine)",
+    "Groupe sanguin",
+    "Rhésus",
+    "TP",
+    "TCA",
+    "Fibrinogène",
+    "Plaquettes",
+    "Ionogramme",
+    "Créatininémie",
+    "Glycémie",
+    "ECG",
+    "Radiographie thoracique",
+    "Consultation d'anesthésie",
+  ],
+  "Imagerie chirurgicale": [
+    "Échographie abdominale",
+    "Échographie pariétale",
+    "Scanner abdominal",
+    "Scanner thoracique",
+    "IRM abdominale",
+    "IRM pelvienne",
+    "Arthroscanner",
+    "Arthro-IRM",
+  ],
+  "Examens endoscopiques": [
+    "Gastroscopie",
+    "Coloscopie",
+    "Cœlioscopie",
+    "Laparoscopie",
+    "Thoracoscopie",
+    "Médiastinoscopie",
+  ],
+  "Examens vasculaires": [
+    "Échodoppler artériel",
+    "Échodoppler veineux",
+    "Artériographie",
+    "Phlébographie",
+    "Angio-IRM",
+    "Angio-scanner",
+  ],
+  "Bilan biologique": [
+    "CRP",
+    "VS",
+    "Albumine",
+    "Protéines totales",
+    "Bilan hépatique",
+    "Marqueurs tumoraux",
+    "Hémocultures",
+  ],
+}
+
+export const SYMPTOMES_CHIR = [
+  "Douleur abdominale aiguë",
+  "Douleur thoracique",
+  "Masse abdominale",
+  "Occlusion intestinale",
+  "Vomissements",
+  "Saignements digestifs",
+  "Traumatisme",
+  "Plaie",
+  "Hernie",
+  "Abcès",
+  "Inflammation",
+  "Gonflement",
+  "Difficulté à respirer",
+  "Douleur intense",
+]
+
+export const PATHOLOGIES_CHIR = [
+  "Appendicite",
+  "Péritonite",
+  "Occlusion intestinale",
+  "Hernie inguinale",
+  "Hernie ombilicale",
+  "Hernie hiatale",
+  "Cholécystite",
+  "Lithiase biliaire",
+  "Pancréatite",
+  "Ulcère perforé",
+  "Cancer colorectal",
+  "Cancer de l'estomac",
+  "Cancer du pancréas",
+  "Cancer du foie",
+  "Traumatisme abdominal",
+  "Rupture de rate",
+  "Traumatisme thoracique",
+  "Pneumothorax",
+  "Cancer du poumon",
+  "Médiastinite",
+  "Anévrisme de l'aorte",
+  "Artériopathie",
+  "Thrombose veineuse",
+  "Embolie pulmonaire",
+  "Varices",
+  "Brûlures",
+  "Infections cutanées",
+  "Tumeurs cutanées",
+]
+
+export const TRAITEMENTS_CHIR = [
+  "Appendicectomie",
+  "Cholécystectomie",
+  "Cure de hernie",
+  "Colectomie",
+  "Gastrectomie",
+  "Pancréatectomie",
+  "Hépatectomie",
+  "Splenectomie",
+  "Thyroïdectomie",
+  "Mastectomie",
+  "Lobectomie pulmonaire",
+  "Pontage aortique",
+  "Endartériectomie",
+  "Amputation",
+  "Parage de plaie",
+  "Suture",
+  "Drainage d'abcès",
+  "Ostéosynthèse",
+  "Prothèse",
+  "Greffe cutanée",
+  "Antibiotiques",
+  "Antalgiques",
+  "Anticoagulants",
+]
+
+export const C_CHIR = {
+  primary: "#dc2626",
+  primarySoft: "#fef2f2",
+  secondary: "#b91c1c",
+  border: "#fecaca",
+}
+
+export default { EXAMENS_CHIR, SYMPTOMES_CHIR, PATHOLOGIES_CHIR, TRAITEMENTS_CHIR, C_CHIR }
