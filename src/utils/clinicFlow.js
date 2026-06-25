@@ -83,6 +83,7 @@ export function libelleServiceFile(f) {
 
 export function buildDonneesBrouillon(data) {
   return {
+    ...data,
     antecedents:         data.antecedents,
     poids:               data.poids,
     diagPresomption:     data.diagPresomption,

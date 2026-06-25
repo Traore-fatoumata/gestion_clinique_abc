@@ -233,7 +233,6 @@ export function Btn({ children, onClick, variant="primary", small=false, disable
 export const inputSt = { width:"100%", padding:"10px 14px", fontSize:14, border:"1.5px solid "+C.border, borderRadius:10, background:C.white, color:C.textPri, outline:"none", fontFamily:"inherit", resize:"vertical" }
 export const labelSt = { display:"block", fontSize:12, fontWeight:600, color:C.textSec, marginBottom:6 }
 
-/** Aligné sur le registre papier « Registre de consultation prénatale » */
 export const PRENATAL_DEFAULT = {
   ddr: "", termeSA: "", gestiteParite: "", dateRdv: "",
   visiteCpn: "", risque: "", tailleCm: "",
@@ -244,6 +243,12 @@ export const PRENATAL_DEFAULT = {
   vat: "", fer: "", acideFolique: "", tpi: "", miiMild: "",
   ptmeConseil: "", ptmeTest: "", ptmeResultat: "", ptmeArv: "", ptmePartenaire: "",
   constatsProblemes: "", notesCpn: "",
+  // Nouveaux champs pour gynécologue/CPN complet
+  dpa: "", avortements: "", mortsNes: "", cesariennes: "", grossessesMultiples: "",
+  temperature: "", fc: "", oedemes: "", conjonctives: "",
+  nombreFoetus: "", positionFoetus: "",
+  colUterin: "", pertesVaginales: "", liquideAmniotique: "",
+  glycemie: "", hepatiteB: "", syphilis: "", nfs: "", ecbu: "", mebendazole: "",
 }
 
 /** Aligné sur le registre « Registre de l'accouchement dans les CS » */

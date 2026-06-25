@@ -13,7 +13,7 @@ router.use(authMiddleware)
 
 // ── Routes ──────────────────────────────────────────────
 router.get("/",              requireRole("comptable"), listerPaiements)
-router.get("/stats",         requireRole("comptable"), getStatistiques)
+router.get("/stats",         requireRole("comptable", "medecin_chef"), getStatistiques)
 router.get("/historique",    requireRole("comptable"), getHistorique)
 router.post("/consultation", requireRole("comptable", "secretaire"), enregistrerPaiementConsultation)
 router.post("/examens",      requireRole("comptable", "secretaire"), enregistrerPaiementExamens)

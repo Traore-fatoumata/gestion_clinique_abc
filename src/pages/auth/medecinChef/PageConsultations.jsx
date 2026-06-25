@@ -350,7 +350,7 @@ export default function PageConsultations({ consultations, patients, file, medec
   ]
 
   return (
-    <div style={{ maxWidth:960, margin:"0 auto" }}>
+    <div style={{ width:"100%", maxWidth:"100%", margin:"0 auto", padding:"0 24px" }}>
       <p style={{ fontSize:28, fontWeight:800, color:C.textPri, letterSpacing:"-0.5px", marginBottom:4 }}>Consultations</p>
       <p style={{ fontSize:14, color:C.textSec, marginBottom:20 }}>
         Gestion complète des consultations · Modification possible en cas d'erreur médicale
