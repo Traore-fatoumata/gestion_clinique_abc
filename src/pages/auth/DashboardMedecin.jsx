@@ -7,6 +7,8 @@ import { C, today, fmt, calcAge, Avatar, Badge, Btn, Card, CardHeader, RdvBadge,
 import ModalFichePatient from "./medecin/ModalFichePatient.jsx"
 import ModalConsultation from "./medecin/ModalConsultation.jsx"
 import ModalCreerRdvMedecin from "./medecin/ModalCreerRdvMedecin.jsx"
+import PageReferencesRecues from "./medecin/PageReferencesRecues.jsx"
+import PageUrgencesTriage from "./medecin/PageUrgencesTriage.jsx"
 
 // ══════════════════════════════════════════════════════
 //  MODAL ORDONNANCE
@@ -396,11 +398,12 @@ export default function DashboardMedecin() {
   const {
     patients: sharedPatients,
     consultations: sharedConsultations,
-    addConsultation, deleteConsultation,
+    addConsultation,
     file, updateFileEntry,
     rdv, addRdv, removeRdv,
     notifs, marquerNotifLue, marquerToutesLues,
     rafraichir,
+    creerReferences,
   } = useSharedData()
 
   const medecin = {
@@ -537,13 +540,8 @@ export default function DashboardMedecin() {
     const patientId = mConsult.patient.id
     const todayStr  = today()
     try {
-      const old = consultations.filter(c =>
-        Number(c.patientId) === Number(patientId) &&
-        (c.date?.slice(0, 10) || c.date) === todayStr &&
-        Number(c.docteurId) === Number(medecin.id) &&
-        !c.signe
-      )
-      for (const ac of old) { if (ac.id) await deleteConsultation(ac.id) }
+      // Note: Pas besoin de supprimer l'ancienne consultation - le backend utilise
+      // ON CONFLICT DO UPDATE pour mettre à jour la consultation existante
       await addConsultation({
         patientId, date: todayStr,
         service:   medecin.specialite,
@@ -552,6 +550,15 @@ export default function DashboardMedecin() {
         envoyerLabo: data.envoyerLabo === true,
         ...data,
       })
+      if (data.refInterServices && data.refInterServices.length > 0) {
+        await creerReferences({
+          patientId,
+          servicesDestinataires: data.refInterServices,
+          motifReference: data.refMotif,
+          priorite: data.refPriorite || "Normale",
+          commentaires: data.refCommentaires || ""
+        })
+      }
       if (rafraichir) await rafraichir()
       alert(data.envoyerLabo
         ? "Examens envoyés au laboratoire. Vous pourrez signer après les résultats."
@@ -569,13 +576,8 @@ export default function DashboardMedecin() {
     }
     const ts = new Date().toLocaleString("fr-FR")
     try {
-      const old = consultations.filter(c =>
-        Number(c.patientId) === Number(patientId) &&
-        (c.date?.slice(0, 10) || c.date) === todayStr &&
-        Number(c.docteurId) === Number(medecin.id) &&
-        !c.signe
-      )
-      for (const ac of old) { if (ac.id) await deleteConsultation(ac.id) }
+      // Note: Pas besoin de supprimer l'ancienne consultation - le backend utilise
+      // ON CONFLICT DO UPDATE pour mettre à jour la consultation existante
       await addConsultation({
         patientId, date: todayStr,
         service:   medecin.specialite,
@@ -583,7 +585,16 @@ export default function DashboardMedecin() {
         signe:     true, signeLe: ts, signePar: medecin.nom,
         ...data,
       })
-      const fileEntry = file.find(f => f.patientId === patientId && f.statut !== "termine")
+      if (data.refInterServices && data.refInterServices.length > 0) {
+        await creerReferences({
+          patientId,
+          servicesDestinataires: data.refInterServices,
+          motifReference: data.refMotif,
+          priorite: data.refPriorite || "Normale",
+          commentaires: data.refCommentaires || ""
+        })
+      }
+      const fileEntry = file.find(f => f.patientId === patientId && Number(f.docteurId) === Number(medecin.id) && f.statut !== "termine")
       if (fileEntry) await updateFileEntry(fileEntry.id, { statut: "termine" })
       setMConsult(null)
       alert("Consultation signée et validée.")
@@ -610,10 +621,14 @@ export default function DashboardMedecin() {
     users: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><circle cx="17.5" cy="7" r="2.5"/><path d="M21.5 20c0-2.8-2-5-4.5-5.5"/></svg>,
     doc:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2h-3"/><rect x="9" y="1" width="6" height="3" rx="1"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>,
     cal:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="16" r="1.5" fill="currentColor" stroke="none"/></svg>,
+    ref:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>,
+    urg:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/></svg>,
   }
   const NAV = [
     { id: "accueil",       label: "Accueil",          icon: "home",  desc: "Vue d'ensemble",        badge: 0                                         },
     { id: "patients",      label: "Mes patients",      icon: "users", desc: "Liste du jour",          badge: enAttente                                 },
+    { id: "references",    label: "Orientations reçues",icon: "ref",   desc: "Demandes inter-services",badge: 0                                         },
+    { id: "urgences",      label: "Triage Urgences",   icon: "urg",   desc: "Premiers soins",        badge: 0                                         },
     { id: "consultations", label: "Mes consultations", icon: "doc",   desc: "Historique & signature", badge: nonSignees                                },
     { id: "rdv",           label: "Mes rendez-vous",   icon: "cal",   desc: "Agenda & planification", badge: mesRdv.filter(r => r.date === today()).length },
   ]
@@ -893,6 +908,8 @@ export default function DashboardMedecin() {
           <p style={{ fontSize: 15, fontWeight: 700, color: C.textPri, lineHeight: 1.2 }}>
             {onglet === "accueil"       && "Accueil"}
             {onglet === "patients"      && "Mes patients du jour"}
+            {onglet === "references"    && "Orientations inter-services reçues"}
+            {onglet === "urgences"      && "Triage & Premiers Soins d'Urgence"}
             {onglet === "consultations" && "Mes consultations"}
             {onglet === "rdv"           && "Mes rendez-vous"}
           </p>
@@ -1035,6 +1052,16 @@ export default function DashboardMedecin() {
               }
             </Card>
           </div>
+        )}
+
+        {/* REFERENCES */}
+        {onglet === "references" && (
+          <PageReferencesRecues medecin={medecin} />
+        )}
+
+        {/* URGENCES */}
+        {onglet === "urgences" && (
+          <PageUrgencesTriage />
         )}
 
         {/* MES PATIENTS */}

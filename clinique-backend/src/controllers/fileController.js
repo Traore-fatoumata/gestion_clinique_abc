@@ -241,7 +241,7 @@ const updateFile = async (req, res) => {
       const pc = paiement_consultation
       // Récupérer patient_id
       const { rows: fileRows } = await client.query(
-        "SELECT patient_id, montant_consultation FROM file_attente WHERE id=$1",
+        "SELECT patient_id, type_visite, montant_consultation FROM file_attente WHERE id=$1",
         [req.params.id]
       )
       if (fileRows.length > 0) {
@@ -254,6 +254,20 @@ const updateFile = async (req, res) => {
            pc.statut, pc.montant || fileRows[0].montant_consultation,
            pc.methode || "cash", pc.note || null]
         )
+
+        // If the payment is completed and it's an emergency visit
+        if (pc.statut === "paye" && fileRows[0].type_visite === "urgence") {
+          // Update waitlist status to 'en_cours' so care can proceed
+          await client.query(
+            "UPDATE file_attente SET statut = 'en_cours', updated_at = NOW() WHERE id = $1 AND statut = 'en_attente'",
+            [req.params.id]
+          )
+          // Update the payment status in prises_en_charge_urgence to 'paye'
+          await client.query(
+            "UPDATE prises_en_charge_urgence SET statut_paiement = 'paye' WHERE facture_generee_id = (SELECT id FROM paiements_consultation WHERE file_id = $1)",
+            [req.params.id]
+          )
+        }
       }
     }
 

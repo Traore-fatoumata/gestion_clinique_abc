@@ -47,6 +47,8 @@ app.use("/api/parametres",   require("./routes/parametres"))
 app.use("/api/paiements",    require("./routes/paiements"))
 app.use("/api/utilisateurs", require("./routes/utilisateurs"))
 app.use("/api/migrations",   require("./routes/migrations"))
+app.use("/api/references",   require("./routes/references"))
+app.use("/api/urgences",     require("./routes/urgences"))
 
 // ── Route de santé ──────────────────────────────────────
 app.get("/api/health", (_req, res) => {

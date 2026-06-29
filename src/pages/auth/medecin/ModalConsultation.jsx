@@ -13,6 +13,23 @@ import ConsultationDiabeto from "./services/diabetologie/consultation.jsx"
 import ConsultationNeuro from "./services/neurologie/consultation.jsx"
 import ConsultationGyneco from "./services/gynecologie/consultation.jsx"
 
+const LISTE_SERVICES = [
+  "Cardiologie",
+  "Pédiatrie",
+  "Gynécologie",
+  "Diabétologie",
+  "Neurologie",
+  "Ophtalmologie",
+  "Traumatologie",
+  "ORL",
+  "Urologie",
+  "Chirurgie",
+  "Dermatologie",
+  "Oncologie",
+  "Maladies infectieuses",
+  "Stomatologie"
+]
+
 // ══════════════════════════════════════════════════════
 //  MODAL — FORMULAIRE CONSULTATION
 // ══════════════════════════════════════════════════════
@@ -57,6 +74,13 @@ export default function ModalConsultation({
   const [accouch, setAccouch] = useState(() => mergeAccouchInit(da))
   const [examensCommandes, setExamensCommandes] = useState(consultation?.examensCommandes || [])
   const [showAddExamen, setShowAddExamen] = useState(false)
+  const [refInterServices, setRefInterServices] = useState([])
+  const [refPriorite, setRefPriorite] = useState("Normale")
+  const [refMotif, setRefMotif] = useState("")
+  const [refCommentaires, setRefCommentaires] = useState("")
+  const handleToggleService = (srv) => {
+    setRefInterServices(p => p.includes(srv) ? p.filter(x => x !== srv) : [...p, srv])
+  }
   const [exCat, setExCat] = useState(Object.keys(EXAMENS_PAR_CATEGORIE)[0])
   const [exCustomNom, setExCustomNom] = useState("")
   const [exCustomPrix, setExCustomPrix] = useState("")
@@ -124,6 +148,9 @@ export default function ModalConsultation({
     if (showAcc && !accouch.dateAcc.trim()) {
       alert("Pour le registre d'accouchement, la date de l'accouchement est obligatoire."); return
     }
+    if (refInterServices.length > 0 && !refMotif.trim()) {
+      alert("Le motif de la référence inter-services est obligatoire."); return
+    }
     const data = {
       motif: form.motif,
       plaintes: form.plaintes,
@@ -141,6 +168,10 @@ export default function ModalConsultation({
       commentaires: form.commentaires,
       typeConsultation: mode,
       assistants: assistants.filter(s => s.nom.trim()),
+      refInterServices,
+      refPriorite,
+      refMotif,
+      refCommentaires,
       ...(showPrenatal && { donneesPrenatal: { ...prenatal, parite: prenatal.gestiteParite, terme: prenatal.termeSA } }),
       ...(showAcc && { donneesAccouchement: { ...accouch } }),
     }
@@ -337,8 +368,13 @@ export default function ModalConsultation({
                 <ConsultationGyneco
                   patient={patient}
                   consultation={consultation}
+                  medecin={medecin}
                   onSave={(data) => {
                     onSauvegarder({ ...form, ...data })
+                    onClose()
+                  }}
+                  onSigner={(data) => {
+                    onSigner({ ...form, ...data })
                     onClose()
                   }}
                   onCancel={onClose}
@@ -753,6 +789,71 @@ export default function ModalConsultation({
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* ── Orientation & Référence Inter-Services ── */}
+              <div style={{ border: "1px solid " + C.border, borderRadius: 14, overflow: "hidden", marginTop: 8 }}>
+                <div style={{ padding: "14px 18px", background: C.blueSoft, borderBottom: "1px solid " + C.border, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri }}>Orientation &amp; Référence Inter-Services</p>
+                    <p style={{ fontSize: 11, color: C.textSec }}>
+                      Référer la patiente vers d'autres services de la clinique si nécessaire
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 14, background: "#fafafa" }}>
+                  <div>
+                    <label style={{ ...labelSt, marginBottom: 6 }}>Sélectionner le(s) service(s) destinataire(s)</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {LISTE_SERVICES.filter(s => s.toLowerCase() !== (medecin?.specialite || "").toLowerCase()).map(srv => {
+                        const selected = refInterServices.includes(srv)
+                        return (
+                          <button key={srv} type="button" onClick={() => handleToggleService(srv)}
+                            style={{
+                              padding: "6px 12px",
+                              background: selected ? C.blue : C.white,
+                              color: selected ? "#fff" : C.textPri,
+                              border: "1px solid " + (selected ? C.blue : C.border),
+                              borderRadius: 20,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                              boxShadow: selected ? "0 2px 6px rgba(37, 99, 235, 0.2)" : "none"
+                            }}>
+                            {selected && "✓ "}
+                            {srv}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {refInterServices.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, animation: "fadeIn 0.2s ease" }}>
+                      <div>
+                        <label style={labelSt}>Niveau de priorité</label>
+                        <select value={refPriorite} onChange={e => setRefPriorite(e.target.value)} style={inputSt}>
+                          <option value="Normale">Normale</option>
+                          <option value="Urgente">Urgente</option>
+                          <option value="Critique">Critique</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={labelSt}>Motif de la référence <span style={{ color: C.red }}>*</span></label>
+                        <input value={refMotif} onChange={e => setRefMotif(e.target.value)} placeholder="Ex : Suspicion de pathologie cardiaque, diagnostic approfondi..." style={inputSt} />
+                      </div>
+                      <div style={{ gridColumn: "span 2" }}>
+                        <label style={labelSt}>Commentaires additionnels</label>
+                        <textarea value={refCommentaires} onChange={e => setRefCommentaires(e.target.value)} placeholder="Détails cliniques additionnels..." rows={2} style={{ ...inputSt, resize: "vertical" }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Avertissement signature */}

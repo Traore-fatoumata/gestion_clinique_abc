@@ -334,6 +334,79 @@ export function SharedDataProvider({ children }) {
   const addResultatLabo    = useCallback((data) => setResultatsLabo(prev => [data, ...prev]), [])
   const updateResultatLabo = useCallback((id, data) => setResultatsLabo(prev => prev.map(r => r.id === id ? { ...r, ...data } : r)), [])
 
+  // ── RÉFÉRENCES INTER-SERVICES ───────────────────────────
+  const creerReferences = useCallback(async (data) => {
+    const res = await apiFetch("/api/references", {
+      method: "POST",
+      body: JSON.stringify({
+        patient_id: data.patientId,
+        services_destinataires: data.servicesDestinataires,
+        motif_reference: data.motifReference,
+        priorite: data.priorite || "Normale",
+        commentaires: data.commentaires,
+      }),
+    })
+    if (res.success) {
+      await chargerDonnees()
+      return res.references
+    }
+    throw new Error(res.message)
+  }, [apiFetch, chargerDonnees])
+
+  const recupererReferencesRecues = useCallback(async (service, statut) => {
+    const path = statut 
+      ? `/api/references/recues/${encodeURIComponent(service)}?statut=${encodeURIComponent(statut)}`
+      : `/api/references/recues/${encodeURIComponent(service)}`
+    const res = await apiFetch(path)
+    return res.references || []
+  }, [apiFetch])
+
+  const mettreAJourStatutReference = useCallback(async (id, statut, commentairesMaj) => {
+    const res = await apiFetch(`/api/references/${id}/statut`, {
+      method: "PATCH",
+      body: JSON.stringify({ statut, commentaires_maj: commentairesMaj }),
+    })
+    if (res.success) {
+      await chargerDonnees()
+      return res.reference
+    }
+    throw new Error(res.message)
+  }, [apiFetch, chargerDonnees])
+
+  // ── URGENCES & TRIAGE ───────────────────────────────────
+  const creerPriseEnChargeUrgence = useCallback(async (data) => {
+    const res = await apiFetch("/api/urgences", {
+      method: "POST",
+      body: JSON.stringify({
+        patient_id: data.patientId,
+        constantes_vitales: data.constantesVitales,
+        observations_initiales: data.observationsInitiales,
+        soins_administres: data.soinsAdministres,
+        medicaments_urgence: data.medicamentsUrgence,
+        consommables_utilises: data.consommablesUtilises,
+        examens_urgents_commandes: data.examensUrgentsCommandes,
+      }),
+    })
+    if (res.success) {
+      await chargerDonnees()
+      return res
+    }
+    throw new Error(res.message)
+  }, [apiFetch, chargerDonnees])
+
+  const chargerConfigUrgences = useCallback(async () => {
+    const res = await apiFetch("/api/urgences/config")
+    return res.config || { regle_paiement_urgences: "soigner_d_abord" }
+  }, [apiFetch])
+
+  const sauvegarderConfigUrgences = useCallback(async (config) => {
+    const res = await apiFetch("/api/urgences/config", {
+      method: "PUT",
+      body: JSON.stringify({ regle_paiement_urgences: config.regle_paiement_urgences }),
+    })
+    return res
+  }, [apiFetch])
+
   return (
     <SharedDataContext.Provider value={{
       patients, file, consultations, rdv, notifs, resultatsLabo, soins, loading,
@@ -343,6 +416,8 @@ export function SharedDataProvider({ children }) {
       addRdv, updateRdv, removeRdv,
       addNotif, marquerNotifLue, marquerToutesLues,
       addResultatLabo, updateResultatLabo,
+      creerReferences, recupererReferencesRecues, mettreAJourStatutReference,
+      creerPriseEnChargeUrgence, chargerConfigUrgences, sauvegarderConfigUrgences,
       // Test helpers
       resetAppDataForTest,
       rafraichir: chargerDonnees,

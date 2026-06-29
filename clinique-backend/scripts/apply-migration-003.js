@@ -1,0 +1,22 @@
+/**
+ * Applique sql/migrations/003_references_and_urgences.sql
+ * Usage: node scripts/apply-migration-003.js
+ */
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") })
+const fs = require("fs")
+const path = require("path")
+const pool = require("../src/config/db")
+
+async function main() {
+  const migrationPath = path.join(__dirname, "..", "sql", "migrations", "003_references_and_urgences.sql")
+  const sql = fs.readFileSync(migrationPath, "utf8")
+  console.log("Exécution de la migration 003 dans la base de données...")
+  await pool.query(sql)
+  console.log("✅ Migration 003_references_and_urgences appliquée avec succès.")
+  process.exit(0)
+}
+
+main().catch(err => {
+  console.error("❌ Erreur lors de l'application de la migration:", err)
+  process.exit(1)
+})

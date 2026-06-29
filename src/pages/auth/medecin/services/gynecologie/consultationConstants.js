@@ -162,7 +162,9 @@ export const RESULTATS_DEPISTAGE = ["Négatif", "Positif", "Indéterminé", "Non
  */
 export const PRESENTATIONS_FŒTALES = [
   "Céphalique",
-  "Siège",
+  "Oblique",
+  "Siège_complète",
+   "Siège_decomplète",
   "Transversale",
   "Non déterminée",
 ]

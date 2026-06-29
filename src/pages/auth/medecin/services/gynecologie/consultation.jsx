@@ -32,10 +32,29 @@ const getExamPrice = (name) => {
   return 0
 }
 
+const LISTE_SERVICES = [
+  "Cardiologie",
+  "Pédiatrie",
+  "Gynécologie",
+  "Diabétologie",
+  "Neurologie",
+  "Ophtalmologie",
+  "Traumatologie",
+  "ORL",
+  "Urologie",
+  "Chirurgie",
+  "Dermatologie",
+  "Oncologie",
+  "Maladies infectieuses",
+  "Stomatologie"
+]
+
 export default function ConsultationGyneco({
   patient,
   consultation,
+  medecin,
   onSave,
+  onSigner,
   onCancel,
 }) {
   // Navigation tabs state
@@ -85,6 +104,16 @@ export default function ConsultationGyneco({
   const [selectedExCategory, setSelectedExCategory] = useState(Object.keys(EXAMENS_GYNECO)[0])
   const [customExamNom, setCustomExamNom] = useState("")
   const [customExamPrix, setCustomExamPrix] = useState("")
+
+  // Internal reference states
+  const [refInterServices, setRefInterServices] = useState(consultation?.refInterServices || [])
+  const [refPriorite, setRefPriorite] = useState(consultation?.refPriorite || "Normale")
+  const [refMotif, setRefMotif] = useState(consultation?.refMotif || "")
+  const [refCommentaires, setRefCommentaires] = useState(consultation?.refCommentaires || "")
+
+  const handleToggleService = (srv) => {
+    setRefInterServices(p => p.includes(srv) ? p.filter(x => x !== srv) : [...p, srv])
+  }
 
   // Automatic calculation functions
   const calculerIMC = (poids, taille) => {
@@ -187,8 +216,8 @@ export default function ConsultationGyneco({
     setListTraitements(prev => prev.filter(t => t.id !== id))
   }
 
-  // Save/Submit consultation
-  const handleSubmit = () => {
+  // Save/Submit consultation (Draft vs Finalized)
+  const handleSubmitAction = (signerVal) => {
     if (!form.diagnostic_principal?.trim()) {
       alert("Le diagnostic principal est obligatoire.")
       return
@@ -203,7 +232,7 @@ export default function ConsultationGyneco({
       return s
     }).filter(Boolean)
 
-    onSave({
+    const data = {
       ...form,
       imc: calculerIMC(form.poids, form.taille),
       dpa: calculerDPA(form.ddr),
@@ -211,7 +240,186 @@ export default function ConsultationGyneco({
       examensCommandes,
       traitements: compiledTraitements,
       listTraitements, // preserve structured format for reloading
-    })
+      refInterServices,
+      refPriorite,
+      refMotif,
+      refCommentaires,
+    }
+
+    if (signerVal) {
+      if (onSigner) onSigner(data)
+      else onSave({ ...data, signe: true })
+    } else {
+      onSave({ ...data, signe: false })
+    }
+  }
+
+  // Print clinical consultation report (Relevant medical details only)
+  const handlePrint = () => {
+    const date = new Date().toLocaleDateString("fr-FR")
+    const dateNaissStr = patient?.dateNaissance
+      ? new Date(patient.dateNaissance).toLocaleDateString("fr-FR")
+      : "—"
+    const age = calcAge(patient?.dateNaissance) || form.age || "—"
+    
+    // Treatments
+    const compiledTraitements = listTraitements.map(t => {
+      let s = t.medicament.trim()
+      if (!s) return null
+      if (t.posologie.trim()) s += ` — ${t.posologie.trim()}`
+      if (t.duree.trim()) s += ` (Pendant ${t.duree.trim()})`
+      return s
+    }).filter(Boolean)
+
+    const w = window.open("", "_blank", "width=750,height=980")
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Consultation Gynécologique — ${patient?.nom || ""}</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:'Segoe UI',sans-serif;margin:0;padding:36px 40px;color:#1e293b;font-size:12.5px;line-height:1.5}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #db2777;padding-bottom:14px;margin-bottom:20px}
+  .title{font-size:20px;font-weight:800;color:#db2777;margin:0 0 3px}
+  .sub{font-size:11px;color:#64748b;margin:2px 0}
+  .hdate{text-align:right;font-size:12px;color:#334155}
+  .hdate strong{font-size:14px;display:block;margin-bottom:2px;color:#db2777}
+  .doc-title{font-size:16px;font-weight:800;text-align:center;letter-spacing:.04em;margin:0 0 18px;text-transform:uppercase;color:#0f172a}
+  
+  .patient-box{border:1.5px solid #db277733;border-radius:8px;overflow:hidden;margin-bottom:20px}
+  .patient-box-header{background:#fdf2f8;padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#db2777;border-bottom:1px solid #db277722}
+  .patient-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+  .pi-item{padding:8px 14px;border-right:1px solid #f1f5f9}
+  .pi-item:last-child{border-right:none}
+  .pi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:3px}
+  .pi-value{font-size:12px;font-weight:700;color:#1e293b}
+  
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .section{margin-bottom:16px;background:#fafafa;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px}
+  .sec-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#db2777;margin-bottom:6px;border-bottom:1px solid #f1f5f9;padding-bottom:4px}
+  .sec-value{font-size:12.5px;color:#334155;line-height:1.5}
+  
+  .param-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .param-item{background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;text-align:center}
+  
+  .footer{margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:14px}
+  .sign-box{text-align:center;width:220px;color:#334155}
+  .sign-line{border-top:1.5px solid #334155;padding-top:6px;font-size:11px;margin-top:36px}
+  .medecin-info{font-size:12.5px;font-weight:700;margin-bottom:2px}
+  .medecin-spec{font-size:11px;color:#64748b;font-weight:400}
+  
+  ol, ul{margin:0;padding-left:18px}
+  li{margin-bottom:4px}
+  @media print{body{padding:10px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="hclinic">
+    <div class="title">Clinique Médicale ABC Marouane</div>
+    <div class="sub">Tannerie, Kaloum · Conakry, République de Guinée</div>
+    <div class="sub">Tél : +224 624 00 00 00</div>
+    <div class="sub">Service : Gynécologie &amp; Obstétrique</div>
+  </div>
+  <div class="hdate"><strong>Date</strong>${date}</div>
+</div>
+<div class="doc-title">Rapport de Consultation Gynécologique</div>
+
+<div class="patient-box">
+  <div class="patient-box-header">Informations Patiente</div>
+  <div class="patient-grid">
+    <div class="pi-item"><div class="pi-label">Nom &amp; Prénom</div><div class="pi-value">${patient?.nom || form.nom || "—"}</div></div>
+    <div class="pi-item"><div class="pi-label">Date de naissance</div><div class="pi-value">${dateNaissStr}</div></div>
+    <div class="pi-item"><div class="pi-label">Âge</div><div class="pi-value">${age} ans</div></div>
+    <div class="pi-item"><div class="pi-label">Téléphone</div><div class="pi-value">${patient?.telephone || form.telephone || "—"}</div></div>
+  </div>
+  <div style="border-top:1px solid #db277722;padding:8px 14px;font-size:12px">
+    <strong>Adresse :</strong> ${patient?.quartier || form.adresse || "—"} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Profession :</strong> ${form.profession || "—"} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Urgence Contact :</strong> ${form.personne_contact || "—"}
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="section">
+    <div class="sec-label">Motif de consultation</div>
+    <div class="sec-value">${form.refMotif || form.constats_problemes || "Consultation gynécologique / prénatale (CPN)"}</div>
+  </div>
+  <div class="section">
+    <div class="sec-label">Antécédents utiles</div>
+    <div class="sec-value">
+      ${form.antecedents_medicaux ? `<div><strong>Médicaux:</strong> ${form.antecedents_medicaux}</div>` : ""}
+      ${form.antecedents_chirurgicaux ? `<div style="margin-top:4px"><strong>Chirurgicaux:</strong> ${form.antecedents_chirurgicaux}</div>` : ""}
+      ${form.antecedents_gyneco ? `<div style="margin-top:4px"><strong>Gynécologiques:</strong> ${form.antecedents_gyneco}</div>` : ""}
+      ${form.antecedents_obstetricaux ? `<div style="margin-top:4px"><strong>Obstétricaux:</strong> ${form.antecedents_obstetricaux}</div>` : ""}
+      ${form.allergies ? `<div style="margin-top:4px;color:#dc2626"><strong>Allergies:</strong> ${form.allergies}</div>` : ""}
+      ${(!form.antecedents_medicaux && !form.antecedents_chirurgicaux && !form.antecedents_gyneco && !form.antecedents_obstetricaux && !form.allergies) ? "Aucun antécédent signalé" : ""}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="section">
+    <div class="sec-label">Constantes Cliniques</div>
+    <div class="param-grid">
+      <div class="param-item"><div class="pi-label">Poids</div><div class="pi-value">${form.poids ? form.poids + " kg" : "—"}</div></div>
+      <div class="param-item"><div class="pi-label">Taille</div><div class="pi-value">${form.taille ? form.taille + " cm" : "—"}</div></div>
+      <div class="param-item"><div class="pi-label">IMC</div><div class="pi-value">${form.imc || "—"}</div></div>
+      <div class="param-item"><div class="pi-label">Tension Art.</div><div class="pi-value">${form.tension || "—"}</div></div>
+      <div class="param-item"><div class="pi-label">Température</div><div class="pi-value">${form.temperature ? form.temperature + " °C" : "—"}</div></div>
+      <div class="param-item"><div class="pi-label">Pouls</div><div class="pi-value">${form.frequence_cardiaque ? form.frequence_cardiaque + " bpm" : "—"}</div></div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <div class="sec-label">Examen Obstétrique / Grossesse</div>
+    <div class="sec-value">
+      ${form.hauteur_uterine ? `<div><strong>Hauteur Utérine:</strong> ${form.hauteur_uterine} cm</div>` : ""}
+      ${form.presentation_fœtale ? `<div style="margin-top:3px"><strong>Présentation:</strong> ${form.presentation_fœtale}</div>` : ""}
+      ${form.maf ? `<div style="margin-top:3px"><strong>MAF (Mouvements):</strong> ${form.maf}</div>` : ""}
+      ${form.bcf ? `<div style="margin-top:3px"><strong>BCF (Battements):</strong> ${form.bcf} bpm</div>` : ""}
+      ${form.col_uterin ? `<div style="margin-top:3px"><strong>Col utérin:</strong> ${form.col_uterin}</div>` : ""}
+      ${form.pertes_vaginales ? `<div style="margin-top:3px"><strong>Pertes / Leucorrhées:</strong> ${form.pertes_vaginales}</div>` : ""}
+      ${(!form.hauteur_uterine && !form.presentation_fœtale && !form.maf && !form.bcf && !form.col_uterin) ? "Aucune donnée de grossesse actuelle" : ""}
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-label">Diagnostics &amp; Conclusion</div>
+  <div class="sec-value">
+    <strong>Diagnostic Principal:</strong> ${form.diagnostic_principal || "—"}<br>
+    ${form.diagnostics_associes ? `<strong>Diagnostics Associés:</strong> ${form.diagnostics_associes}<br>` : ""}
+    ${form.constats_problemes ? `<strong>Observations Cliniques:</strong> ${form.constats_problemes}<br>` : ""}
+    ${form.observations ? `<strong>Notes:</strong> ${form.observations}<br>` : ""}
+    ${form.prochain_rdv ? `<strong>Prochain RDV / Suivi CPN:</strong> ${new Date(form.prochain_rdv).toLocaleDateString("fr-FR")}<br>` : ""}
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="section">
+    <div class="sec-label">Traitements prescrits</div>
+    <div class="sec-value">
+      ${compiledTraitements.length > 0 
+        ? `<ol>${compiledTraitements.map(t => `<li>${t}</li>`).join("")}</ol>`
+        : "<em>Aucun médicament prescrit</em>"
+      }
+    </div>
+  </div>
+  
+  <div class="section">
+    <div class="sec-label">Recommandations &amp; Conseils</div>
+    <div class="sec-value">${form.conseils || "Repos et hygiène de vie standard."}</div>
+  </div>
+</div>
+
+<div class="footer">
+  <div>Rapport médical confidentiel établi le ${date}</div>
+  <div class="sign-box">
+    <div class="medecin-info">Dr. ${medecin?.nom || "—"}</div>
+    <div class="medecin-spec">Spécialiste en Gynécologie-Obstétrique</div>
+    <div class="sign-line">Signature &amp; Cachet du médecin</div>
+  </div>
+</div>
+</body></html>`)
+    w.document.close()
+    setTimeout(() => w.print(), 450)
   }
 
   const TABS = [
@@ -1447,6 +1655,73 @@ export default function ConsultationGyneco({
               </div>
             </RegSection>
 
+            {/* 14b. Orientation Interne (Inter-Services) */}
+            <RegSection title="14b. Orientation & Référence Inter-Services (Interne)">
+              <div style={{ border: "1px solid " + C.border, borderRadius: 14, overflow: "hidden", marginBottom: "16px" }}>
+                <div style={{ padding: "14px 18px", background: C.blueSoft, borderBottom: "1px solid " + C.border, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.textPri }}>Orientation Interne</p>
+                    <p style={{ fontSize: 11, color: C.textSec }}>
+                      Référer la patiente vers un ou plusieurs services internes de la clinique
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 14, background: "#fafafa" }}>
+                  <div>
+                    <label style={{ ...labelSt, marginBottom: 6 }}>Sélectionner le(s) service(s) destinataire(s)</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {LISTE_SERVICES.filter(s => s.toLowerCase() !== "gynécologie").map(srv => {
+                        const selected = refInterServices.includes(srv)
+                        return (
+                          <button key={srv} type="button" onClick={() => handleToggleService(srv)}
+                            style={{
+                              padding: "6px 12px",
+                              background: selected ? C.blue : C.white,
+                              color: selected ? "#fff" : C.textPri,
+                              border: "1px solid " + (selected ? C.blue : C.border),
+                              borderRadius: 20,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                              boxShadow: selected ? "0 2px 6px rgba(37, 99, 235, 0.2)" : "none"
+                            }}>
+                            {selected && "✓ "}
+                            {srv}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {refInterServices.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14 }}>
+                      <div>
+                        <label style={labelSt}>Niveau de priorité</label>
+                        <select value={refPriorite} onChange={e => setRefPriorite(e.target.value)} style={inputSt}>
+                          <option value="Normale">Normale</option>
+                          <option value="Urgente">Urgente</option>
+                          <option value="Critique">Critique</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={labelSt}>Motif de la référence <span style={{ color: C.red }}>*</span></label>
+                        <input value={refMotif} onChange={e => setRefMotif(e.target.value)} placeholder="Ex : Diagnostic obstétrical croisé, bilan d'imagerie..." style={inputSt} />
+                      </div>
+                      <div style={{ gridColumn: "span 2" }}>
+                        <label style={labelSt}>Commentaires additionnels</label>
+                        <textarea value={refCommentaires} onChange={e => setRefCommentaires(e.target.value)} placeholder="Notes cliniques additionnelles pour le confrère..." rows={2} style={{ ...inputSt, resize: "vertical" }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </RegSection>
+
             {/* 15. Conclusion */}
             <RegSection title="15. Conclusion clinique & Suivi">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
@@ -1498,14 +1773,16 @@ export default function ConsultationGyneco({
       </div>
 
       {/* Modern Footer Actions */}
-      <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", borderTop: `1px solid ${C.border}`, paddingTop: "14px", marginTop: "4px" }}>
-        <Btn onClick={onCancel} variant="secondary">
-          Annuler
+      <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", borderTop: `1px solid ${C.border}`, paddingTop: "14px", marginTop: "4px", flexWrap: "wrap" }}>
+        <Btn onClick={onCancel} variant="secondary">Annuler</Btn>
+        <Btn onClick={handlePrint} variant="secondary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ marginRight: 6 }}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Imprimer
         </Btn>
-        <Btn onClick={handleSubmit} variant="success">
-          Enregistrer la Consultation
-        </Btn>
+        <Btn onClick={() => handleSubmitAction(false)} variant="secondary">Sauvegarder</Btn>
+        <Btn onClick={() => handleSubmitAction(true)} variant="success">Signer</Btn>
+        <Btn onClick={() => handleSubmitAction(true)} variant="primary">Valider</Btn>
       </div>
     </div>
-  )
+  );
 }
